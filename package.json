@@ -1,0 +1,28 @@
+{
+  "name": "exampletypescript",
+  "version": "1.0.0",
+  "description": "An Example Typescript project",
+  "main": "dist/main.js",
+  "dependencies": {
+    "gulp-delete-file": "^1.0.2",
+    "jquery": "^3.3.1",
+    "typescript-collections": "^1.3.2"
+  },
+  "devDependencies": {
+    "@types/jquery": "^3.3.0",
+    "browserify": "^16.0.0",
+    "gulp": "^3.9.1",
+    "gulp-sourcemaps": "^2.6.4",
+    "gulp-typescript": "^4.0.1",
+    "gulp-uglify": "^3.0.0",
+    "tsify": "^3.0.4",
+    "typescript": "^2.7.1",
+    "vinyl-buffer": "^1.0.1",
+    "vinyl-source-stream": "^2.0.0"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Abhishek Divekar",
+  "license": "MIT"
+}
