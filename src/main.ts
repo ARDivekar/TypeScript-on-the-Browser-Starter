@@ -1,7 +1,7 @@
 import * as $ from "jquery";
-import { Person } from "./Person"
-import { Organization } from "./Organization"
-import { TechCompany } from "./TechCompany"
+import { Person } from "./CompanyLib/Person"
+import { Organization } from "./CompanyLib/Organization"
+import { TechCompany } from "./CompanyLib/TechCompany"
 
 let amazon = new TechCompany("Amazon", "amazon.com");
 
