@@ -7,43 +7,42 @@ var uglify = require('gulp-uglify');
 var sourcemaps = require('gulp-sourcemaps');
 var buffer = require('vinyl-buffer');
 
-var BUILD_DIR_NAME = 'build';
+var SOURCE_DIR = 'src';
+var BUILD_DIR = 'build';
 var MINIFIED_OUT_FILE = 'allFiles-min.js';
 
 /* delete all *.js files in the src/ folder */
 gulp.task('js-src-clean', function () {
     var regexp = /.*\.js$/
     gulp.src([
-        './src/**/*.js'
+        './' + SOURCE_DIR + '/**/*.js'
     ]).pipe(deleteFile({
         reg: regexp,
         deleteMatch: true
     }));
-});
+}); 
 
 /* Delete all files in the "build" folder. */
-gulp.task('clean', function () {
-    var regexp = /.*/;
-    gulp.src(['./build/*'
+gulp.task('clean-js', function () {
+    var regexp = /.*\.js/;
+    gulp.src(['./' + BUILD_DIR + '/*'
     ]).pipe(deleteFile({
         reg: regexp,
         deleteMatch: true
     }));
 });
 
-var paths = {
-    pages: ['src/*.html']
-};
+
 gulp.task("copy-html", function () {
-    return gulp.src(paths.pages)
-        .pipe(gulp.dest(BUILD_DIR_NAME));
+    return gulp.src([SOURCE_DIR + '/*.html'])
+        .pipe(gulp.dest(BUILD_DIR));
 });
 
-gulp.task("debug", ["clean", "copy-html"], function () {
+gulp.task("debug", ["clean-js", "copy-html"], function () {
     return browserify({
         basedir: '.',
         debug: true,
-        entries: ['src/main.ts'],
+        entries: [SOURCE_DIR + '/main.ts'],
         cache: {},
         packageCache: {}
     })
@@ -54,13 +53,13 @@ gulp.task("debug", ["clean", "copy-html"], function () {
         .pipe(sourcemaps.init({ loadMaps: true }))
         .pipe(uglify())
         .pipe(sourcemaps.write('./'))
-        .pipe(gulp.dest(BUILD_DIR_NAME));
+        .pipe(gulp.dest(BUILD_DIR));
 });
 
-gulp.task("prod", ["clean", "copy-html"], function () {
+gulp.task("prod", ["clean-js", "copy-html"], function () {
     return browserify({
         basedir: '.',
-        entries: ['src/main.ts'],
+        entries: [SOURCE_DIR + '/main.ts'],
         cache: {},
         packageCache: {}
     })
@@ -69,5 +68,5 @@ gulp.task("prod", ["clean", "copy-html"], function () {
         .pipe(vsource(MINIFIED_OUT_FILE))
         .pipe(buffer())
         .pipe(uglify())
-        .pipe(gulp.dest(BUILD_DIR_NAME));
+        .pipe(gulp.dest(BUILD_DIR));
 });
