@@ -2,6 +2,10 @@ import * as $ from "jquery";
 import { Person } from "./CompanyLib/Person"
 import { Organization } from "./CompanyLib/Organization"
 import { TechCompany } from "./CompanyLib/TechCompany"
+import { Order } from "./ProductLib/Order";
+import { TShirt, TShitSizes } from "./ProductLib/TShirt";
+import { Catalog } from "./ProductLib/Catalog";
+import { Price, Currency } from "./ProductLib/Price";
 
 let amazon = new TechCompany("Amazon", "amazon.com");
 
@@ -23,6 +27,18 @@ showEmployees();
 let cocaCola = new Organization("Coca cola");
 let pepsi = new Organization("Pepsi");
 console.log(pepsi.toString() == cocaCola.toString());
+
+let ralphLauren = new Organization("Ralph Lauren");
+let c: Catalog = new Catalog("Ralph Lauren sportswear");
+c.addProduct(new TShirt('Polo Shirt L', ralphLauren, new Price(10, Currency.USD), TShitSizes.Large));
+c.addProduct(new TShirt('Polo Shirt M', ralphLauren, new Price(7, Currency.USD), TShitSizes.Medium));
+c.addProduct(new TShirt('Polo Shirt S', ralphLauren, new Price(5, Currency.USD), TShitSizes.Small));
+console.log(c.toString());
+let o = new Order();
+o.addItem(c.selectProductFromCatalog(1), 1);
+o.addItem(c.selectProductFromCatalog(3), 5);
+o.purchase();
+console.log(o.getInvoice());
 
 throw new EvalError("This is how an error appears, even on minified files.");
 // console.log("This should not be seen on the console.");

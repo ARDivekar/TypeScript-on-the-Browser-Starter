@@ -11,6 +11,11 @@ export class Organization{
     public addEmployee(e: Person){
         this.employees.add(e);
     }
+
+    toString(): string{
+        return this.name;
+    }
+    
     public getHTMLString(): string {
         let out : string = 'This organization has ' + this.employees.size() + ' employees';
         if(this.employees.size() > 0)
