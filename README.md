@@ -1,4 +1,5 @@
-# This project is a starter for web applications using TypeScript on the client side.
+# This project is a starter for web applications using TypeScript on the client side. 
+# It describes end-to-end to set up a TypeScript build system using Gulp + Browserify + UglifyJS, for both Dev and Production environments, along with sample TypeScript code.
 
 ## Why?
 A lot of large web applications today use Java on the server side. As a result, teams are often made completely of Java developers who are unfamilar with the weirdness of JavaScript.
