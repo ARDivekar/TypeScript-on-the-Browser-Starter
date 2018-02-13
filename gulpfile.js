@@ -1,72 +1,34 @@
-var gulp = require("gulp");
-var deleteFile = require('gulp-delete-file');
-var browserify = require("browserify");
-var vsource = require('vinyl-source-stream');
-var tsify = require("tsify");
-var uglify = require('gulp-uglify');
-var sourcemaps = require('gulp-sourcemaps');
-var buffer = require('vinyl-buffer');
+/* gulpfile.js */
+var gulp = require('gulp');
 
 var SOURCE_DIR = 'src';
 var BUILD_DIR = 'build';
-var MINIFIED_OUT_FILE = 'allFiles-min.js';
+var SOURCE_MAPS_DIR = 'sourcemaps';
 
-/* delete all *.js files in the src/ folder */
-gulp.task('js-src-clean', function () {
-    var regexp = /.*\.js$/
-    gulp.src([
-        './' + SOURCE_DIR + '/**/*.js'
-    ]).pipe(deleteFile({
-        reg: regexp,
-        deleteMatch: true
-    }));
-}); 
+require('./gulp/js-clean-src')(SOURCE_DIR);
 
-/* Delete all files in the "build" folder. */
-gulp.task('clean-js', function () {
-    var regexp = /.*\.js/;
-    gulp.src(['./' + BUILD_DIR + '/*'
-    ]).pipe(deleteFile({
-        reg: regexp,
-        deleteMatch: true
-    }));
-});
+require('./gulp/clean-build')(BUILD_DIR);
 
+require('./gulp/js-browserify-single-file')(
+    SOURCE_DIR, 'main.js',
+    BUILD_DIR, 'allFiles.js'
+);
 
-gulp.task("copy-html", function () {
-    return gulp.src([SOURCE_DIR + '/*.html'])
-        .pipe(gulp.dest(BUILD_DIR));
-});
+require('./gulp/ts-browserify-single-file')(
+    SOURCE_DIR, 'main.ts', /* Note: TypeScript file */
+    BUILD_DIR, 'allFiles.js'
+);
 
-gulp.task("debug", ["clean-js", "copy-html"], function () {
-    return browserify({
-        basedir: '.',
-        debug: true,
-        entries: [SOURCE_DIR + '/main.ts'],
-        cache: {},
-        packageCache: {}
-    })
-        .plugin(tsify)
-        .bundle()
-        .pipe(vsource(MINIFIED_OUT_FILE))
-        .pipe(buffer())
-        .pipe(sourcemaps.init({ loadMaps: true }))
-        .pipe(uglify())
-        .pipe(sourcemaps.write('./'))
-        .pipe(gulp.dest(BUILD_DIR));
-});
+require('./gulp/ts-browserify-minify-single-file')(
+    SOURCE_DIR, 'main.ts',
+    BUILD_DIR, 'allFiles-min.js'
+);
 
-gulp.task("prod", ["clean-js", "copy-html"], function () {
-    return browserify({
-        basedir: '.',
-        entries: [SOURCE_DIR + '/main.ts'],
-        cache: {},
-        packageCache: {}
-    })
-        .plugin(tsify)
-        .bundle()
-        .pipe(vsource(MINIFIED_OUT_FILE))
-        .pipe(buffer())
-        .pipe(uglify())
-        .pipe(gulp.dest(BUILD_DIR));
-});
+require('./gulp/ts-browserify-single-file-with-sourcemap')(
+    SOURCE_DIR, 'main.ts', 
+    BUILD_DIR, 'allFiles-min.js',
+    SOURCE_MAPS_DIR
+);
+
+gulp.task('debug', ['clean-build', 'ts-browserify-single-file-with-sourcemap']);
+gulp.task('prod', ['clean-build', 'ts-browserify-minify-single-file']);

@@ -29,14 +29,14 @@ let pepsi = new Organization("Pepsi");
 console.log(pepsi.toString() == cocaCola.toString());
 
 let ralphLauren = new Organization("Ralph Lauren");
-let c: Catalog = new Catalog("Ralph Lauren sportswear");
-c.addProduct(new TShirt('Polo Shirt L', ralphLauren, new Price(10, Currency.USD), TShitSizes.Large));
-c.addProduct(new TShirt('Polo Shirt M', ralphLauren, new Price(7, Currency.USD), TShitSizes.Medium));
-c.addProduct(new TShirt('Polo Shirt S', ralphLauren, new Price(5, Currency.USD), TShitSizes.Small));
-console.log(c.toString());
+let catalog: Catalog = new Catalog("Ralph Lauren sportswear");
+catalog.addProduct(new TShirt('Polo Shirt L', ralphLauren, new Price(10, Currency.USD), TShitSizes.Large));
+catalog.addProduct(new TShirt('Polo Shirt M', ralphLauren, new Price(7, Currency.USD), TShitSizes.Medium));
+catalog.addProduct(new TShirt('Polo Shirt S', ralphLauren, new Price(5, Currency.USD), TShitSizes.Small));
+console.log(catalog.toString());
 let o = new Order();
-o.addItem(c.selectProductFromCatalog(1), 1);
-o.addItem(c.selectProductFromCatalog(3), 5);
+o.addItem(catalog.selectProductFromCatalog(1), 1);
+o.addItem(catalog.selectProductFromCatalog(3), 5);
 o.purchase();
 console.log(o.getInvoice());
 
