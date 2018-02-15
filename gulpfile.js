@@ -24,6 +24,11 @@ require('./gulp/ts-browserify-minify-single-file')(
     BUILD_DIR, 'allFiles-min.js'
 );
 
+require('./gulp/ts-browserify-minify-single-file-keep-fnames')(
+    SOURCE_DIR, 'main.ts',
+    BUILD_DIR, 'allFiles-min.js'
+);
+
 require('./gulp/ts-browserify-single-file-with-sourcemap')(
     SOURCE_DIR, 'main.ts', 
     BUILD_DIR, 'allFiles-min.js',
@@ -31,4 +36,4 @@ require('./gulp/ts-browserify-single-file-with-sourcemap')(
 );
 
 gulp.task('debug', ['clean-build', 'ts-browserify-single-file-with-sourcemap']);
-gulp.task('prod', ['clean-build', 'ts-browserify-minify-single-file']);
+gulp.task('prod', ['clean-build', 'ts-browserify-minify-single-file-keep-fnames']);

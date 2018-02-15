@@ -536,3 +536,57 @@ Now, we set up the build system:
     }
     ```
     Now, we can just run `$ gulp debug` to while debugging, or `$ gulp prod` before pushing to a real website. You should add these commands to your deployment scripts.
+
+1. One possible issue we might face is the  minified file clashing with other minified dependencies that we have. E.g. if, along with importing `build/allFiles-min.js`, you also need to include `https://cdn.com/someLib-version-1.min.js`. Since the files are only minified within their own scope, it is entirely possible they use some of the same obfuscated variable names like `o`, `p`, `s`, etc.
+    
+    The way to avoid this problem is simple: we just add a flag in our `uglify(...)` call to ensure that the function names are not stripped ([Source](https://github.com/terinjokes/gulp-uglify/issues/160)). In TypeScript, you only need to make sure that the identifiers of your top-level code (classes, functions visible in the browser context) are unique across the page. TypeScript classes are compiled to functions from ECMAScript3 to ECMAScript5, and to JavaScript classes in ECMAScript6 and above.
+
+    The change required for this has minimal differences for our `gulp prod` invocation:
+    ```js
+    /* gulp/ts-browserify-minify-single-file-keep-fnames.js */
+    var gulp = require('gulp'),
+        browserify = require('browserify'),
+        tsify = require("tsify");
+        source = require('vinyl-source-stream'),
+        buffer = require('vinyl-buffer'),
+        uglify = require('gulp-uglify');
+
+    module.exports = function (SOURCE_DIR, ENTRY_FILE_NAME, BUILD_DIR, OUT_FILE_NAME) {
+        gulp.task('ts-browserify-minify-single-file-keep-fnames', function () {
+            return browserify({
+                entries: [
+                    SOURCE_DIR + '/' + ENTRY_FILE_NAME
+                ]
+            })
+                .plugin(tsify)
+                .bundle()
+                .pipe(source(OUT_FILE_NAME))
+                .pipe(buffer())
+                .pipe(uglify({ mangle: { keep_fnames: true } }))
+                .pipe(gulp.dest(BUILD_DIR));
+        });
+    }
+    ```
+    And update the gulpfile:
+    ```js
+    /* gulpfile.js */
+    var gulp = require('gulp');
+
+    var SOURCE_DIR = 'src';
+    var BUILD_DIR = 'build';
+
+    require('./gulp/ts-browserify-minify-single-file-keep-fnames')(
+        SOURCE_DIR, 'main.ts',
+        BUILD_DIR, 'allFiles-min.js'
+    );
+
+    gulp.task('prod', ['clean-build', 'ts-browserify-minify-single-file-keep-fnames']);
+    ```
+    Now, when we run `$ gulp prod`, we get a minified file that retains the function names (no JavaScript classes, since our `tsconfig.json` has us compiling with `"target": "es5"`).
+
+    Let's check the size of our minified file:
+    ```
+    $ wc -m build\allFiles-min.js
+    129143 build\allFiles-min.js
+    ``` 
+    The filesize increase in minimal (from 120kB to 126 kB...a little more than 4.4%). Which is a good tradeoff to ensure that the code does not interact badly with other code on the page.

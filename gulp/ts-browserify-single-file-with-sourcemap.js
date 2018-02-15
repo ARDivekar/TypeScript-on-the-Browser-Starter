@@ -2,7 +2,7 @@
 var gulp = require('gulp'),
     browserify = require('browserify'),
     tsify = require("tsify");
-source = require('vinyl-source-stream'),
+    source = require('vinyl-source-stream'),
     buffer = require('vinyl-buffer'),
     sourcemaps = require('gulp-sourcemaps'),
     uglify = require('gulp-uglify');
