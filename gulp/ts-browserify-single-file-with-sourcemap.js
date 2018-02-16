@@ -1,7 +1,7 @@
 /* gulp/ts-browserify-single-file-with-sourcemap.js */
 var gulp = require('gulp'),
     browserify = require('browserify'),
-    tsify = require("tsify");
+    tsify = require("tsify"),
     source = require('vinyl-source-stream'),
     buffer = require('vinyl-buffer'),
     sourcemaps = require('gulp-sourcemaps'),

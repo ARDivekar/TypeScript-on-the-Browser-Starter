@@ -1,5 +1,5 @@
 /* gulp/js-clean-src.js */
-var gulp = require("gulp");
+var gulp = require("gulp"),
     deleteFile = require('gulp-delete-file');
 
 module.exports = function (SOURCE_DIR) {

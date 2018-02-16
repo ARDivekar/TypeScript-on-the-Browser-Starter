@@ -1,7 +1,7 @@
 /* gulp/ts-browserify-minify-single-file.js */
 var gulp = require('gulp'),
     browserify = require('browserify'),
-    tsify = require("tsify");
+    tsify = require("tsify"),
     source = require('vinyl-source-stream'),
     buffer = require('vinyl-buffer'),
     uglify = require('gulp-uglify');
