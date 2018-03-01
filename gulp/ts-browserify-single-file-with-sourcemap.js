@@ -4,15 +4,15 @@ var gulp = require('gulp'),
     tsify = require("tsify"),
     source = require('vinyl-source-stream'),
     buffer = require('vinyl-buffer'),
-    sourcemaps = require('gulp-sourcemaps'),
-    uglify = require('gulp-uglify');
+    sourcemaps = require('gulp-sourcemaps');
 
 module.exports = function (
     SOURCE_DIR,
     ENTRY_FILE_NAME,
     BUILD_DIR,
     OUT_FILE_NAME,
-    SOURCE_MAPS_DIR) {
+    SOURCE_MAPS_DIR
+) {
     gulp.task('ts-browserify-single-file-with-sourcemap', function () {
         return browserify({
             entries: [

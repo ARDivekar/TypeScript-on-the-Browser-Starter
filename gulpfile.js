@@ -37,3 +37,17 @@ require('./gulp/ts-browserify-single-file-with-sourcemap')(
 
 gulp.task('debug', ['clean-build', 'ts-browserify-single-file-with-sourcemap']);
 gulp.task('prod', ['clean-build', 'ts-browserify-minify-single-file-keep-fnames']);
+
+
+
+require('./gulp/ts-browserify-animal-module')(
+    SOURCE_DIR, 
+    BUILD_DIR,
+    SOURCE_MAPS_DIR
+);
+
+require('./gulp/ts-browserify-main2')(
+    SOURCE_DIR, 
+    BUILD_DIR,
+    SOURCE_MAPS_DIR
+);
