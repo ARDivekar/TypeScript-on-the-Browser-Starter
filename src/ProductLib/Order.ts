@@ -1,6 +1,5 @@
 import { Product } from './Product';
 
-
 class OrderItem{
     constructor(readonly product:Product, readonly quantity:number){
         if (this.quantity !== Math.round(this.quantity))

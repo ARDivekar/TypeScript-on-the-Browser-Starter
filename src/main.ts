@@ -1,11 +1,8 @@
 import * as $ from "jquery";
-import { Person } from "./CompanyLib/Person"
-import { Organization } from "./CompanyLib/Organization"
-import { TechCompany } from "./CompanyLib/TechCompany"
-import { Order } from "./ProductLib/Order";
-import { TShirt, TShitSizes } from "./ProductLib/TShirt";
-import { Catalog } from "./ProductLib/Catalog";
-import { Price, Currency } from "./ProductLib/Price";
+
+
+import { Person, Organization, TechCompany } from "./CompanyLib"
+import { Order, TShirt, TShirtSizes, Catalog, Price, Currency } from "./ProductLib";
 
 let amazon = new TechCompany("Amazon", "amazon.com");
 
@@ -30,9 +27,9 @@ console.log(pepsi.toString() == cocaCola.toString());
 
 let ralphLauren = new Organization("Ralph Lauren");
 let catalog: Catalog = new Catalog("Ralph Lauren sportswear");
-catalog.addProduct(new TShirt('Polo Shirt L', ralphLauren, new Price(10, Currency.USD), TShitSizes.Large));
-catalog.addProduct(new TShirt('Polo Shirt M', ralphLauren, new Price(7, Currency.USD), TShitSizes.Medium));
-catalog.addProduct(new TShirt('Polo Shirt S', ralphLauren, new Price(5, Currency.USD), TShitSizes.Small));
+catalog.addProduct(new TShirt('Polo Shirt L', ralphLauren, new Price(10, Currency.USD), TShirtSizes.Large));
+catalog.addProduct(new TShirt('Polo Shirt M', ralphLauren, new Price(7, Currency.USD), TShirtSizes.Medium));
+catalog.addProduct(new TShirt('Polo Shirt S', ralphLauren, new Price(5, Currency.USD), TShirtSizes.Small));
 console.log(catalog.toString());
 let o = new Order();
 o.addItem(catalog.selectProductFromCatalog(1), 1);

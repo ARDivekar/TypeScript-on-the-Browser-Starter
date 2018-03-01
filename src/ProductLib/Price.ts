@@ -1,10 +1,4 @@
-export enum Currency{
-    USD = "USD",
-    EUR = "EUR",
-    GBP = "GBP",
-    INR = "INR",
-    JYP = "JYP",
-}
+import { Currency } from "./Currency";
 
 export class Price{
     constructor(
