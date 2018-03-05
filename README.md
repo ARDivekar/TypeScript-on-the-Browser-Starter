@@ -1109,3 +1109,435 @@ I still think it is possible to do code-splitting using Browserify, but I can't 
 Your best bets are either `external` and `require`, `factor-bundle`, or `partition-bundle`. If you do figure it out, please add it to [the repo](https://github.com/ARDivekar/TypeScript-on-the-Browser-Starter/issues)! I'd be very thankful :)
 
 
+
+
+# Webpack-based build system
+
+To enable code-splitting in the fashion specified above, we are forced to ditch Browserify since it does not easily support the features we want. Instead, we will use Webpack as our module loader. It has numerous advantages, including:
+
+1. [Excellent configurability via a separate configuration file](https://webpack.js.org/configuration/).
+
+1. [Wide usage by large industry players](https://webpack.js.org), much more than Browserify. Frameworks such as Google's Angular use it as the default module bundler.
+
+1. First-class feature support: this is a philosophical difference between Browserify and Webpack. Browserify allows developers create their own plugins for any new feature. Thus, there are a _lot_ of things you can do in Browserify, but occasionally they are via obscure, unsupported and brittle libraries. Webpack, on the other hand, keeps enhancing existing features. This keeps its core set of features smaller but more robust. For our use-case, Webpack is the better fit.
+
+1. Webpack can perform the vast majority of the tasks you’d otherwise do through a task runner. For instance, Webpack already provides options for minification and sourcemaps for your bundle. By using loaders, you can also add ES6 to ES5 transpilation, and CSS pre- and post-processors. That really just leaves unit tests and linting as major tasks that Webpack can’t handle independently. ([Source](https://www.toptal.com/front-end/webpack-browserify-gulp-which-is-better))
+
+1. Solid documentation.
+
+1. As per their  Suited for big projects
+
+[This post](https://scotch.io/tutorials/getting-started-with-webpack-module-bundling-magic) is a good introduction to Webpack and how to set it up.
+
+As stated from the main webpack site, the main goals of creating another module bundler are the abilities to:
+- Split the dependency tree into chunks loaded on demand
+- Keep initial loading time low
+- Every static asset should be able to be a module
+- Ability to integrate 3rd-party libraries as modules
+- Ability to customize nearly every part of the module bundler
+- Suited for big projects
+
+
+
+## The working of Webpack
+
+From the website [[1]](https://webpack.js.org/concepts/) [[2](https://webpack.js.org/concepts/loaders/)] (paraphrased):
+
+> At its core, webpack is a _static module bundler; when webpack processes your application, it builds a dependency graph by recursively including every module your application needs, then packages all of those modules into one or more bundles.
+>
+> An _entry point_ indicates which module(s) webpack should use to begin building the dependency graph. After entering the entry point, webpack will follow the trail of imports and discover which other modules and libraries that entry point depends on (directly and indirectly). Every such dependency is then processed and outputted into files called _bundles_.
+>
+> The _output_ field of the configuration js file, tells webpack where to emit the bundles it creates and how to name those bundle files. (You may see the term emitted or emit used throughout our documentation and plugin API. This is a fancy term for 'produced' or 'discharged').
+
+So far, it's similar to Browserify. A critical difference comes in the next section:
+
+> _Loaders_ enable webpack to process **more than just JavaScript files** (webpack itself only understands JavaScript). They give you the ability to leverage webpack's bundling capabilities for all kinds of static asset files by converting them to valid modules that webpack can process. Essentially, webpack loaders transform all types of files into modules that can be included in your application's dependency graph (and eventually a bundle).
+>
+> Loaders are transformations that are applied on the source code of a module. They allow you to pre-process files as you import or “load” them. Thus, loaders are kind of like “tasks” in other build tools, and provide a powerful way to handle front-end build steps. 
+>
+> Loaders can transform files from a different language (like TypeScript) to JavaScript, or inline images as data URLs. Loaders even allow you to do things like import CSS files directly from your JavaScript modules!
+>
+> Note that the ability to import any type of module, e.g. .css files, is a feature specific to webpack and may not be supported by other bundlers or task runners. We feel this extension of the language is warranted as it allows developers to build a more accurate dependency graph.
+
+Webpack aims to be the "one module bundler to rule them all". It can handle multiple different types of static assets that need to be served on the client-side: 
+1. JavaScript
+1. CSS
+1. Images
+1. etc. 
+
+Loaders are basically transformers; they convert one file type into another before adding it to the output bundle. For example, the `ts-loader` converts TypeScript to JavaScript while Webpack is processing it. We have similar loaders to convert CoffeeScript to JavaScript, Sass to CSS, etc. 
+
+In Browserify, loaders exist, but they are considered plugins for the framework. This leads to loaders having maintainers other than the Browserify team, which leads to the loaders being inconsistent with each other. Webpack removes this problem by exposing loaders as a core framework concept, in a separate category from other plugins.
+
+> While loaders are used to transform certain types of modules, _plugins_ can be leveraged to perform a wider range of tasks. Plugins range from bundle optimization and minification all the way to defining environment-like variables. The plugin interface is extremely powerful and can be used to tackle a wide variety of tasks.
+
+
+### Webpack config file:
+
+The [recommended way](https://webpack.js.org/concepts/loaders/#using-loaders) to use Webpack is to set up a configuration file `webpack.config.js` in the root of your project. 
+
+You can learn all about it from[ here](https://webpack.js.org/configuration/).
+
+The [Webpack concepts doc](https://webpack.js.org/concepts/) is pretty clear on how a basic config file is put together:
+
+1. Structure:
+
+    The config file in general has this structure:
+    ```js
+    /* webpack.config.js */
+    const config = {
+        ...
+    };
+    module.exports = config;
+    ```
+    The JSON object `config` is exported by this file is the configuration. In the following sections, we will reference different configuration properties using the syntax `config.property.subproperty`
+
+1. Entries:
+    
+    An entry point indicates which module(s) webpack should use to begin building out its internal dependency graph.
+
+    `config.entry` allows you to specify the entry point(s). It takes as input either a:
+    1. String:
+        ```js
+        const config = {
+            entry: './path/to/my/entry/file.js',
+            ...
+        };
+        ```
+        Here, there is only a single entry file.
+    1. Array of strings:
+        ```js
+        const config = {
+            entry: ['./path/to/my/entry/file.js', './path/to/my/entry/file2.js', './path/to/my/entry/file3.js'],
+            ...
+        };
+        ```
+        Passing an array of file paths to the entry property creates what is known as a "multi-main entry". This is useful when you would like to inject multiple dependent files together and graph their dependencies into one "chunk".
+    1. Map (i.e. JSON):
+        ```js
+        const config = {
+            entry: {
+                entryOne: './src/entryOne.js',
+                entryTwo: './src/entryTwo.js',
+                entryThree: './src/entryThree.js',
+            },
+            ...
+        };
+        ```
+        Here, we tell Webpack to make separate dependency graphs for each entry point. However, we can configure plugins such that one dependency graph is modified with respect to the others. See the [scenarios](https://webpack.js.org/concepts/entry-points/#scenarios) part of the docs:
+            - If we do an `app.js` and `vendor.js` split of entry points, we can use the `CommonsChunkPlugin` to replace all `require()`s in `app.js` that refer to vendor libraries, with calls to `__webpack_require__()`. Thus, the vendor code (i.e. dependencies like jQuery, etc) does not get built into the app bundle, so that the webpage can import them both in separate `<script>` tags. Thus, the vendor code can be cached by the browser, as it seldom changes. Only the `app.js` bundle is reloaded.
+            - If we create an entry point for each page in our multi-page app, `CommonsChunkPlugin` can create a bundle of the JS application code that is shared between pages. Multi-page applications that reuse a lot of code/modules between entry points can greatly benefit from these techniques, as the amount of entry points increase.
+        
+        Note that as a rule of thumb in Webpack, each page should have its own _entry point_ (not necessarily one `<script>` import). We adhere to this principle in our code structure: `main.ts` is an entry point for `index.html`, and `main2.ts` for `index2.html`. These entry point files do have some business logic, but it is possible that they will dumbly import some of our library bundles (AnimalLib, ProductLib, CompanyLib) which in turn register JavaScript event handlers so that the user can interact with the page.
+
+1. Outputs:
+
+    ([Source](https://webpack.js.org/concepts/output/))
+
+    1. The output property tells webpack where to emit the bundles it creates and how to name these files. You can configure this part of the process by specifying a field `config.output` in the configuration. `config.output.filename` and `config.output.path` tell webpack the name of our bundle and where we want it to be "emitted" to (i.e. where we want it to be saved):
+        ```js
+        const path = require('path');
+        const config = {
+            entry: './path/to/my/entry/file.js',
+            output: {
+                path: path.resolve(__dirname, 'build'),
+                filename: 'my-webpack.bundle.js'
+            }
+        };
+        ```
+        This generates the file `build/my-webpack.bundle.js`.
+        
+        Note that we use Node's built-in `path` module and prefix it with the `__dirname` global. This prevents file path issues between operating systems and allows relative paths to work as expected.
+        
+    1. If your configuration creates multiple bundles via more than one entry point, code splitting, or various plugins (like `CommonsChunkPlugin`), you should use [substitutions](https://webpack.js.org/configuration/output/#output-filename) to ensure that each file has a unique name. With substitutions, the value of `config.output.filename` that we specify is a _template string_ from all the outpt files will be named.
+
+        There are different types of substitutions possible:
+        1. Using entry name:
+            ```js
+            filename: "[name].bundle.js"
+            ```
+        1. Using internal chunk id:
+            ```js
+            filename: "[id].bundle.js"
+            ```
+        1. Using the unique hash generated for every build:
+            ```js
+            filename: "[name].[hash].bundle.js"
+            ```
+        1. Using hashes based on each chunks' content:
+            ```js
+            filename: "[chunkhash].bundle.js"
+            ```
+        Note that output files created by loaders aren't affected by this option; you would have to try the specific loader's available options.
+
+        Note this option is called filename but you are still allowed to use something like `"js/[name]/bundle.js"` to create a folder structure.
+    
+    1. `config.output.publicPath` is used for on-demand loading of resources, or loading of external resources (e.g. from a CDN, etc). ([Source](https://webpack.js.org/configuration/output/#output-publicpath))
+
+        This option is used in conjunction with `path`, and specifies the public URL of the output directory, when referenced in a browser. 
+
+        E.g. If we expect the contents of our local directory `public/assets` will be hosted on a CDN:
+        ```js
+        const config = {
+            output: {
+                path: path.resolve(__dirname, "public/assets"),
+                publicPath: "https://cdn.example.com/my-uid/assets/"
+                ...
+            }
+        }
+        ```
+        Then, the HTML might have something like this:
+        ```html
+        <link href="/assets/spinner.gif" />
+        ```
+        Or when loading an image in the CSS:
+        ```css
+        background-image: url(/assets/spinner.gif);
+        ```
+
+        
+        Note that this is the path of the public _directory_. So, it usually ends in `/`.
+
+        A relative URL is resolved relative to the HTML page (i.e. `<base>` tag). Server-relative URLs, protocol-relative URLs, absolute URLs are sometimes required, e.g. when hosting assets on a CDN. 
+
+        ```js
+        publicPath: "https://cdn.example.com/assets/"   /* CDN (always HTTPS) */
+        publicPath: "//cdn.example.com/assets/"         /* CDN (same protocol) */
+        publicPath: "/assets/"      /* server-relative */
+        publicPath: "assets/"       /* relative to HTML page */
+        publicPath: "../assets/"    /* relative to HTML page */
+        publicPath: ""              /* relative to HTML page (in same directory) */
+        ```
+
+         If you don't know the publicPath while compiling, you can omit it and set `__webpack_public_path__` in your entry point file:
+         ```js
+         __webpack_public_path__ = myRuntimePublicPath
+        /* rest of your entry file code */
+        ```
+        See [this discussion](https://github.com/webpack/webpack/issues/2776#issuecomment-233208623) for more info.
+
+
+1. Module Loaders:
+
+    Sources: [[1](https://webpack.js.org/concepts/#loaders)], [[2](https://webpack.js.org/concepts/loaders/#using-loaders)]
+
+    1. In contrast to Node.js modules, webpack modules can express their dependencies in a variety of ways. A few examples are:
+        - An ES2015 `import` statement (also used by newer versions of TypeScript).
+        - A CommonJS `require()` statement
+        - An AMD `define` and `require` statement
+        - An `@import` statement inside of a css/sass/less file.
+        - An image url in a stylesheet (`url(...)`) or html (`<img src=...>`) file.
+
+        Webpack supports modules written in a variety of languages and preprocessors, via loaders. Loaders describe to webpack how to process non-JavaScript modules and include these dependencies into your bundles. 
+        
+        The webpack community has built loaders for a wide variety of popular languages and language processors, including CoffeeScript, TypeScript, Sass, Less, ESNext (Babel), etc. See the [list of loaders](https://webpack.js.org/loaders).
+
+        [Source](https://webpack.js.org/concepts/modules/) for above.
+
+        The option `config.module` object in the Webpack config determines how the different types of modules will be treated. This includes specifying loaders. 
+
+    1. Webpack loaders are specified as [_Rules_]((https://webpack.js.org/configuration/module/#rule)). 
+    A Rule is a pair of a [_Condition_](https://webpack.js.org/configuration/module/#condition) and a [_Result_](https://webpack.js.org/configuration/module/#rule-results). Their relation is simple: while bundling dependencies, if a module (i.e. source file) matches a Condition, the corresponding Result is triggered. Additionally, nested rules may be evaluated if the parent Rule condition matches, allowing us to create if-else heirarchies of rules.
+
+        `config.module.rules` is the array of all Rules for that webpack config (remember, loaders are Rules). Each Rules is a JSON object with various subproperties such as `issuer`, `loader`, `include`, `exclude`, `rules` etc. Some of these properties belong to the Rule's Condition, and some to the Rule's Result. [Nested rules](https://webpack.js.org/configuration/module/#nested-rules) can be specified under the properties `rules` and `oneOf`. 
+
+        1. [Rule Condition(s)](https://webpack.js.org/configuration/module/#rule-conditions) are the crierion to be checked before the rule is executed. 
+
+            A [Condition](https://webpack.js.org/configuration/module/#condition) is a specific thing in Webpack. It is either:
+
+            1. A string: To match, the input must start with the provided string. i.e. an absolute directory path, or absolute path to the file.
+            1. A RegExp: It's tested with the input.
+            1. A function: It's called with the input and must return a truthy value to match.
+            1. An array of Conditions: At least one of the Conditions must match.
+            1. An object: All properties must match exactly. Each property has a defined behavior.
+
+            There are two types of Condition a Rule can specify:
+            
+            1. _Resource_: An absolute path to the file requested/imported, that is already resolved using webpacks's [resolve rules](https://webpack.js.org/configuration/resolve)
+        
+            1. _Issuer_: An absolute path to the file of the module which requested the resource. It is the file in which the `import` statement is located.
+                
+            E.g. When `app.js` has an import statement for `'./style.css'`, we will create Conditions to match the issuer as `/path/to/app.js` and the resource as `/path/to/style.css`. 
+            
+            > Basically, the "issuer" issues requests for "resources", which are fulfilled by Webpack's module loader.
+
+
+        1. Rule Results are the actions to be performed when a rule condition matches (it specifies what the result of a rule should be).
+
+            The values of this config property can be either:
+
+            1. Loaders: An array of loaders that is applied to the resource. The next point shall talk about this in detail.
+
+            1. Parsers: An options object which should be used to create the parser for this module. This is specified by the [`Rule.parser` object](https://webpack.js.org/configuration/module/#rule-parser) (if it exists).
+    
+    1. As mentioned, each object in the array `config.module.rules` defines a Rule, which is itself an (unnamed) JSON. The key-value pairs of this JSON define properties for the Rule. 
+    
+        > Remember, each Rule is applied to a module (source file) in the dependency graph; if the Condition matches either the module's resource or issuer, then the Rule's Result is applied to the module.
+
+        There are actually only a few different properties which are a direct child of the Rule JSON, e.g. `Rule.use`, `Rule.resource`, `Rule.issuer`, `Rule.enforce`, etc. The others that are specified in [the docs](https://webpack.js.org/configuration/module/#rule-enforce), such as `Rule.include`, `Rule.test`, and `Rule.loader`, are just aliases for `Rule.resource.include`, `Rule.resource.test`, `Rule.use: [ { loader } ]`, etc. 
+        
+        To prevent confusion, I shall not be using these aliases, but will specify the subproperties explicitly.
+
+        1. `Rule.resource` specifies Conditions to match the "resource" defined above (i.e. the file which is being imported). This has the following subproperties ([Source](https://webpack.js.org/configuration/module/#condition)):
+            - `Rule.resource.test`: The Condition passed must match. The convention is to provide a RegExp or array of RegExps here, but it's not enforced. Generally used to specify the filenames to which we should apply the Rule.
+
+            - `Rule.resource.include`: The Condition passed must match. The convention is to provide a string or array of strings here, but it's not enforced. Generally used to specify directories to include in the search path.
+
+            - `Rule.resource.exclude`: The Condition must NOT match. The convention is to provide a string or array of strings here, but it's not enforced. Generally used to specify directories to exclude from the search path.
+
+            - `Rule.resource.and`: specifies an Array of conditions. All Conditions must match. 
+
+            - `Rule.resource.or`: specifies an Array of conditions. Any Condition must match. 
+
+            - `Rule.resource.not`: specifies an Array of conditions. No Condition must match. 
+
+            Note that `test` and `include` are actually identical, the only difference is how they are conventionally used. Both must be matched for the Rule to be triggered ([Source](https://webpack.js.org/configuration/)).
+
+            E.g. (following the conventions):
+            ```js
+            /* webpack.config.js */
+            const path = require('path');
+
+            const config = {
+                ...
+                module: {},
+                ...
+            };
+            config.module.rules = [
+                {
+                    resource: {
+                        test: /\.css$/,
+                        include: [
+                            path.resolve(__dirname, "app/styles"),
+                            path.resolve(__dirname, "vendor/styles")
+                        ]
+                    }
+                }
+            ];
+            module.exports = config; /* the CommonJS module of webpack.config.js */
+            ```
+
+        1. `Rule.issuer` is used to match against the module that issued the request for the resource. E.g.
+        ```js
+        /* index.js */
+        import A from 'a.js'
+        ```
+        Here, the resouce is `a.js` and its issuer is the _path_ to `index.js`. This option can be used to apply loaders to the dependencies of a specific module or set of modules.
+
+
+        1. `Rule.use` specifies an Array of [UseEntry](https://webpack.js.org/configuration/module/#useentry)s. Each UseEntry specifies a loader to be used to do the transforming, and (optionally) some options used to configure the loader. 
+
+            A UseEntry is an object, which must have the property `'loader'` (a string), and an optional `'options'` property (a string or an object) to configure the loader. 
+
+            E.g. 
+            ```js
+            config.module.rules[i].use = [
+                {
+                    loader: "css-loader",
+                    options: {
+                        modules: true
+                    }
+                }
+            ];
+            ```
+
+            There are a few shortcuts to specifying a loader:
+            1. If there is only one loader for the rule, which takes the default options, we can use:
+                ```js
+                config.module.rules[i].use = 'some-loader-name';
+                ```
+            1. If we have multiple loaders, for any one which uses its default options, we can just give the loader string instead of an object:
+                ```js
+                config.module.rules[i].use = [
+                    'style-loader',
+                    {
+                        loader: 'css-loader',
+                        options: {
+                        importLoaders: 1
+                        }
+                    },
+                    {
+                        loader: 'less-loader',
+                        options: {
+                        noIeCompat: true
+                        }
+                    }
+                ];
+                ```
+            1. `Rule.loader` is an alias for a single `Rule.use: [ { loader } ]`. Note that `Rule.loaders` is deprecated as per Webpack 4.
+            
+            - The simplest loader (which does no pre-processing) is the `'raw-loader'`:
+                ```js
+                /* webpack.config.js */
+                const path = require('path');
+
+                const config = {
+                    entry: './path/to/my/entry/file.js',
+                    output: {
+                        path: path.resolve(__dirname, 'dist'),
+                        filename: 'my-first-webpack.bundle.js'
+                    },
+                    module: {
+                        rules: [
+                        { 
+                            resource: { test: /\.txt$/ },
+                            use: 'raw-loader' 
+                        }
+                        ]
+                    }
+                };
+                ```
+                This config essentially says:
+                > "Hey webpack compiler, when you come across a path that resolves to a '.txt' file inside of a `require()` or `import` statement, use the `raw-loader` to transform it before you add it to the bundle."
+            
+            - We can also have more complex loaders, which we must configure. 
+                
+                E.g. `awesome-typescript-loader` is an npm library which allows Webpack to convert TypeScript to JavaScript. An alternative is `ts-loader`, but this one is faster.
+
+                The config for using this loader, in our current project would be:
+
+                ```js
+               /* webpack.config.js */
+                const path = require('path');
+
+                const config = {
+                    entry: './src/main.ts',
+                    module: {
+                        rules: [
+                            {
+                                resource: {
+                                    test: /\.ts$/,
+                                    exclude: /node_modules/,
+                                },
+                                use: 'awesome-typescript-loader',
+                            }
+                        ]
+                    },
+                    resolve: {
+                        extensions: ['.ts', '.js']
+                    },
+                    output: {
+                        filename: 'output.bundle.js',
+                        path: path.resolve(__dirname, 'build')
+                    }
+                };
+                module.exports = config;
+                ```
+                On running `$ webpack`, this generates a single bundle file, `build/output.bundle.js`
+        
+        1. `Rule.enforce` specifies the category of the loader.
+
+            Loaders in Webpack have a category, which defines the order in which they are sorted and used:
+            1. `pre` loaders (`Rule.enforce` is `'pre'`)
+            2. [Inline loaders]. These are loaders applied inline of the import/require.(https://webpack.js.org/concepts/loaders/#inline)
+            3. Normal loader (no value of `Rule.enforce`)
+            4. `post` loaders (`Rule.enforce` is `'post'`)
+
+            Now, you may be thinking, if this property is applied on individual loaders, why isn't part of the UseEntry for that loader e.g. in the loader options? I didn't find a really good answer for this. I do know that you have to put `enforce` on the entire rule, as described in [this SO answer](https://stackoverflow.com/a/44310311/4900327). To separate loaders by their value of `enforce`, you have to make separate rules.
+
+        1. Nested rules are supported by two properties:
+            1. `Rule.oneOf`: An array of Rules from which only the first matching Rule is used when the Rule matches.
+            1. `Rule.rules`: An array of Rules that is also used when the Rule matches.
+
+        1. There is also [`Rule.resourceQuery`](https://webpack.js.org/configuration/module/#rule-resourcequery) which matches rules based on the value of [`Rule.options`](https://webpack.js.org/configuration/module/#rule-options-rule-query).
+    
