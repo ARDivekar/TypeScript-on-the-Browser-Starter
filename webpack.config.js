@@ -15,7 +15,7 @@ const config = {
         ]
     },
     resolve: {
-        extensions: ['.ts', '.js']
+        extensions: ['.ts', '.js', 'json']
     },
     output: {
         filename: 'output.bundle.js',

@@ -1328,38 +1328,41 @@ The [Webpack concepts doc](https://webpack.js.org/concepts/) is pretty clear on 
         - An `@import` statement inside of a css/sass/less file.
         - An image url in a stylesheet (`url(...)`) or html (`<img src=...>`) file.
 
-        Webpack supports modules written in a variety of languages and preprocessors, via loaders. Loaders describe to webpack how to process non-JavaScript modules and include these dependencies into your bundles. 
+        Webpack supports modules written in a variety of languages and preprocessors, via loaders. 
+        
+        > Loaders tell webpack how to process non-JavaScript modules and include their dependencies into your bundles. Loaders can emit arbitrary additional files as well.
         
         The webpack community has built loaders for a wide variety of popular languages and language processors, including CoffeeScript, TypeScript, Sass, Less, ESNext (Babel), etc. See the [list of loaders](https://webpack.js.org/loaders).
 
-        [Source](https://webpack.js.org/concepts/modules/) for above.
+        ([Source](https://webpack.js.org/concepts/modules/) for above).
 
         The option `config.module` object in the Webpack config determines how the different types of modules will be treated. This includes specifying loaders. 
 
     1. Webpack loaders are specified as [_Rules_]((https://webpack.js.org/configuration/module/#rule)). 
-    A Rule is a pair of a [_Condition_](https://webpack.js.org/configuration/module/#condition) and a [_Result_](https://webpack.js.org/configuration/module/#rule-results). Their relation is simple: while bundling dependencies, if a module (i.e. source file) matches a Condition, the corresponding Result is triggered. Additionally, nested rules may be evaluated if the parent Rule condition matches, allowing us to create if-else heirarchies of rules.
+    
+        A Rule is a pair containing a [_Condition_](https://webpack.js.org/configuration/module/#condition) and a [_Result_](https://webpack.js.org/configuration/module/#rule-results). Their relation is simple: while bundling dependencies, if a module (i.e. source file) matches a Condition, the corresponding Result is triggered. 
 
-        `config.module.rules` is the array of all Rules for that webpack config (remember, loaders are Rules). Each Rules is a JSON object with various subproperties such as `issuer`, `loader`, `include`, `exclude`, `rules` etc. Some of these properties belong to the Rule's Condition, and some to the Rule's Result. [Nested rules](https://webpack.js.org/configuration/module/#nested-rules) can be specified under the properties `rules` and `oneOf`. 
-
-        1. [Rule Condition(s)](https://webpack.js.org/configuration/module/#rule-conditions) are the crierion to be checked before the rule is executed. 
-
-            A [Condition](https://webpack.js.org/configuration/module/#condition) is a specific thing in Webpack. It is either:
-
-            1. A string: To match, the input must start with the provided string. i.e. an absolute directory path, or absolute path to the file.
-            1. A RegExp: It's tested with the input.
-            1. A function: It's called with the input and must return a truthy value to match.
-            1. An array of Conditions: At least one of the Conditions must match.
-            1. An object: All properties must match exactly. Each property has a defined behavior.
-
-            There are two types of Condition a Rule can specify:
-            
-            1. _Resource_: An absolute path to the file requested/imported, that is already resolved using webpacks's [resolve rules](https://webpack.js.org/configuration/resolve)
+        `config.module.rules` is the array containing all Rules in the webpack config (remember, loaders are Rules). 
         
-            1. _Issuer_: An absolute path to the file of the module which requested the resource. It is the file in which the `import` statement is located.
-                
-            E.g. When `app.js` has an import statement for `'./style.css'`, we will create Conditions to match the issuer as `/path/to/app.js` and the resource as `/path/to/style.css`. 
+        Each `Rule` is a JSON object with various subproperties such as `issuer`, `loader`, `include`, `exclude`, `rules` etc. Some of these properties belong to the Rule's Condition, and some to the Rule's Result. [Nested rules](https://webpack.js.org/configuration/module/#nested-rules) can be specified under the properties `rules` and `oneOf`. 
+
+        1. [Rule Condition(s)](https://webpack.js.org/configuration/module/#rule-conditions) are the crierion to be checked before the rule is executed. If the module's properties (filename, filetype etc) matches the Condition criterion, the Rule is executed.
+
+            - A [Condition](https://webpack.js.org/configuration/module/#condition) is a specific thing in Webpack. It is either:
+
+                1. A string: To match, the input module must start with the provided string. i.e. an absolute directory path, or absolute path to the file.
+                1. A RegExp: It's tested with the input.
+                1. A function: It's called with the input and must return a truthy value as to whether the input matches the Condition.
+                1. An array of Conditions: At least one of the Conditions must match.
+                1. An object: All properties must match exactly. Each property has a defined behavior.
+
+            - There are two types of Condition a Rule can specify:
             
-            > Basically, the "issuer" issues requests for "resources", which are fulfilled by Webpack's module loader.
+                1. _Resource_: An absolute path to the file requested/imported, that is already resolved using webpacks's [resolve rules](https://webpack.js.org/configuration/resolve)
+            
+                1. _Issuer_: An absolute path to the file of the module which requested the resource. It is the file in which the `import` statement is located.
+                    
+                E.g. When `app.js` has an import statement for `'./style.css'`, we will create Condition(s) to match the issuer as `/path/to/app.js` and/or the resource as `/path/to/style.css`. 
 
 
         1. Rule Results are the actions to be performed when a rule condition matches (it specifies what the result of a rule should be).
@@ -1370,7 +1373,7 @@ The [Webpack concepts doc](https://webpack.js.org/concepts/) is pretty clear on 
 
             1. Parsers: An options object which should be used to create the parser for this module. This is specified by the [`Rule.parser` object](https://webpack.js.org/configuration/module/#rule-parser) (if it exists).
     
-    1. As mentioned, each object in the array `config.module.rules` defines a Rule, which is itself an (unnamed) JSON. The key-value pairs of this JSON define properties for the Rule. 
+    1. As mentioned, each object in the array `config.module.rules` defines a Rule, which is itself a JSON. The key-value pairs of this JSON define properties for the Rule. 
     
         > Remember, each Rule is applied to a module (source file) in the dependency graph; if the Condition matches either the module's resource or issuer, then the Rule's Result is applied to the module.
 
@@ -1379,11 +1382,11 @@ The [Webpack concepts doc](https://webpack.js.org/concepts/) is pretty clear on 
         To prevent confusion, I shall not be using these aliases, but will specify the subproperties explicitly.
 
         1. `Rule.resource` specifies Conditions to match the "resource" defined above (i.e. the file which is being imported). This has the following subproperties ([Source](https://webpack.js.org/configuration/module/#condition)):
-            - `Rule.resource.test`: The Condition passed must match. The convention is to provide a RegExp or array of RegExps here, but it's not enforced. Generally used to specify the filenames to which we should apply the Rule.
+            - `Rule.resource.test`: The value of this property is a Condition and it must match. The convention is to provide a Condition which is a RegExp or array of RegExps here, but it's not enforced. This property is generally used to specify the filenames to which we should apply the Rule.
 
-            - `Rule.resource.include`: The Condition passed must match. The convention is to provide a string or array of strings here, but it's not enforced. Generally used to specify directories to include in the search path.
+            - `Rule.resource.include`: The value of this property is a Condition and it must match. The convention is to provide a Condition which is an string or array of strings here, but it's not enforced. This property is generally used to specify directories to include in the search path.
 
-            - `Rule.resource.exclude`: The Condition must NOT match. The convention is to provide a string or array of strings here, but it's not enforced. Generally used to specify directories to exclude from the search path.
+            - `Rule.resource.exclude`: The Condition must NOT match. The convention is to provide a a Condition which is a string or array of strings here, but it's not enforced. This property is generally used to specify directories to exclude from the search path.
 
             - `Rule.resource.and`: specifies an Array of conditions. All Conditions must match. 
 
@@ -1417,54 +1420,56 @@ The [Webpack concepts doc](https://webpack.js.org/concepts/) is pretty clear on 
             module.exports = config; /* the CommonJS module of webpack.config.js */
             ```
 
-        1. `Rule.issuer` is used to match against the module that issued the request for the resource. E.g.
-        ```js
-        /* index.js */
-        import A from 'a.js'
-        ```
-        Here, the resouce is `a.js` and its issuer is the _path_ to `index.js`. This option can be used to apply loaders to the dependencies of a specific module or set of modules.
+        1. `Rule.issuer` is used to match against the module that issued the request for the resource. 
+        
+            E.g.
+            ```js
+            /* index.js */
+            import A from 'a.js'
+            ```
+            Here, the resouce is `a.js` and its issuer is the _path_ to `index.js`. This option can be used to apply loaders to the dependencies of a specific module or set of modules.
 
 
         1. `Rule.use` specifies an Array of [UseEntry](https://webpack.js.org/configuration/module/#useentry)s. Each UseEntry specifies a loader to be used to do the transforming, and (optionally) some options used to configure the loader. 
 
-            A UseEntry is an object, which must have the property `'loader'` (a string), and an optional `'options'` property (a string or an object) to configure the loader. 
+            - A UseEntry is an object, which must have the property `'loader'` (a string of the loader name), and an optional `'options'` property (a string or an object) to configure the loader. 
 
-            E.g. 
-            ```js
-            config.module.rules[i].use = [
-                {
-                    loader: "css-loader",
-                    options: {
-                        modules: true
-                    }
-                }
-            ];
-            ```
-
-            There are a few shortcuts to specifying a loader:
-            1. If there is only one loader for the rule, which takes the default options, we can use:
-                ```js
-                config.module.rules[i].use = 'some-loader-name';
-                ```
-            1. If we have multiple loaders, for any one which uses its default options, we can just give the loader string instead of an object:
+                E.g. 
                 ```js
                 config.module.rules[i].use = [
-                    'style-loader',
                     {
-                        loader: 'css-loader',
+                        loader: "css-loader",
                         options: {
-                        importLoaders: 1
-                        }
-                    },
-                    {
-                        loader: 'less-loader',
-                        options: {
-                        noIeCompat: true
+                            modules: true
                         }
                     }
                 ];
                 ```
-            1. `Rule.loader` is an alias for a single `Rule.use: [ { loader } ]`. Note that `Rule.loaders` is deprecated as per Webpack 4.
+
+                There are a few shortcuts to specifying a loader:
+                1. If there is only one loader for the rule, which takes the default options, we can use:
+                    ```js
+                    config.module.rules[i].use = 'some-loader-name';
+                    ```
+                1. If we have multiple loaders, for any one which uses its default options, we can just give the loader string instead of an object:
+                    ```js
+                    config.module.rules[i].use = [
+                        'style-loader',
+                        {
+                            loader: 'css-loader',
+                            options: {
+                            importLoaders: 1
+                            }
+                        },
+                        {
+                            loader: 'less-loader',
+                            options: {
+                            noIeCompat: true
+                            }
+                        }
+                    ];
+                    ```
+                1. `Rule.loader` is an alias for a single `Rule.use: [ { loader } ]`. Note that the similar-sounding `Rule.loaders` is deprecated as per Webpack 4.
             
             - The simplest loader (which does no pre-processing) is the `'raw-loader'`:
                 ```js
@@ -1475,12 +1480,14 @@ The [Webpack concepts doc](https://webpack.js.org/concepts/) is pretty clear on 
                     entry: './path/to/my/entry/file.js',
                     output: {
                         path: path.resolve(__dirname, 'dist'),
-                        filename: 'my-first-webpack.bundle.js'
+                        filename: 'my-app.bundle.js'
                     },
                     module: {
                         rules: [
                         { 
-                            resource: { test: /\.txt$/ },
+                            resource: { 
+                                test: /\.txt$/ 
+                            },
                             use: 'raw-loader' 
                         }
                         ]
@@ -1488,16 +1495,18 @@ The [Webpack concepts doc](https://webpack.js.org/concepts/) is pretty clear on 
                 };
                 ```
                 This config essentially says:
-                > "Hey webpack compiler, when you come across a path that resolves to a '.txt' file inside of a `require()` or `import` statement, use the `raw-loader` to transform it before you add it to the bundle."
+                > "Hey webpack compiler, start resolving the dependency graph from the entry module, and when you come across a path that resolves to a '.txt' file inside of a `require()` or `import` statement, use the `raw-loader` to transform it before you add it to the bundle." 
+
+                
             
-            - We can also have more complex loaders, which we must configure. 
+            - `raw-loader` in the above example does nothing, but other loaders might actually peform some transformations on the file. 
                 
                 E.g. `awesome-typescript-loader` is an npm library which allows Webpack to convert TypeScript to JavaScript. An alternative is `ts-loader`, but this one is faster.
 
                 The config for using this loader, in our current project would be:
 
                 ```js
-               /* webpack.config.js */
+                /* webpack.config.js */
                 const path = require('path');
 
                 const config = {
@@ -1523,21 +1532,257 @@ The [Webpack concepts doc](https://webpack.js.org/concepts/) is pretty clear on 
                 };
                 module.exports = config;
                 ```
-                On running `$ webpack`, this generates a single bundle file, `build/output.bundle.js`
+                On running `$ webpack`, this generates a single bundle file, `build/output.bundle.js`. We can then import this bundle from the HTML.
         
         1. `Rule.enforce` specifies the category of the loader.
 
-            Loaders in Webpack have a category, which defines the order in which they are sorted and used:
-            1. `pre` loaders (`Rule.enforce` is `'pre'`)
-            2. [Inline loaders]. These are loaders applied inline of the import/require.(https://webpack.js.org/concepts/loaders/#inline)
+            Loaders in Webpack have a "category", which defines the order in which they are sorted and used:
+            1. `pre` loaders (`Rule.enforce` = `'pre'`)
+            2. [Inline loaders](https://webpack.js.org/concepts/loaders/#inline). These are loaders applied inline, during the `import`/`require` statement in the issuer file.
             3. Normal loader (no value of `Rule.enforce`)
-            4. `post` loaders (`Rule.enforce` is `'post'`)
+            4. `post` loaders (`Rule.enforce` = `'post'`)
 
             Now, you may be thinking, if this property is applied on individual loaders, why isn't part of the UseEntry for that loader e.g. in the loader options? I didn't find a really good answer for this. I do know that you have to put `enforce` on the entire rule, as described in [this SO answer](https://stackoverflow.com/a/44310311/4900327). To separate loaders by their value of `enforce`, you have to make separate rules.
 
-        1. Nested rules are supported by two properties:
-            1. `Rule.oneOf`: An array of Rules from which only the first matching Rule is used when the Rule matches.
-            1. `Rule.rules`: An array of Rules that is also used when the Rule matches.
+        1. Nested rules may be evaluated if the parent Rule's Condition matches or does not match. This allows us to create if-else heirarchies of Rules. 
+        
+            Nested rules can be created by defining two properties of a Rule:
+                1. `Rule.oneOf`: An array of Rules from which only the first matching Rule is used when the Rule matches.
+                1. `Rule.rules`: An array of Rules that is also used when the Rule matches.
 
         1. There is also [`Rule.resourceQuery`](https://webpack.js.org/configuration/module/#rule-resourcequery) which matches rules based on the value of [`Rule.options`](https://webpack.js.org/configuration/module/#rule-options-rule-query).
     
+
+1. Module Resolution:
+    
+    Sources: [[1](https://webpack.js.org/concepts/module-resolution/)] 
+
+    - A _resolver_ is a library which helps locate the absolute path of a module specified in a `require`/`import` statement. 
+    
+        Webpack requires a resolver because because source code modules can be specified as a dependency in multiple different ways ([Source](https://webpack.js.org/concepts/module-resolution/#resolving-rules-in-webpack)):
+
+        1. **Absolute** paths:
+            ```js
+            import "/home/me/file";
+
+            import "C:\\Users\\me\\file";
+            ```
+            Here, since we already have the absolute path to the file, no further resolution is required.
+
+        1. **Relative** paths:
+            ```js
+            import "../src/file1";
+            import "./file2";
+            ```
+            In this case, the directory of the file where the import/require occurs, is taken to be the _context directory_.  
+            
+            The absolute path of the dependency is obtained by joining the path specified in the import/require to this context directory's path.
+
+        1. **Module** paths:
+            ```js
+            import "module";
+            import "module/lib/file";
+            ```
+            Modules are searched for inside all directories specified in `config.resolve.modules` property. You can replace the original module path by an alternate path by creating an alias for it using `config.resolve.alias` configuration option.
+        
+        Webpack uses [enhanced-resolve](https://github.com/webpack/enhanced-resolve) to resolve file paths while bundling modules.
+    
+    - Once the absolute path is resolved based on the above rule, the resolver checks to see if the path points to a file or a directory. 
+    
+        - If the path points to a file:
+            1. If the path has a file extension, then the file is bundled straightaway.
+
+            1. Otherwise, the file extension is resolved using the `resolve.extensions` option, which tells the resolver which extensions (`.js`, `.jsx`, `.ts` etc.) are acceptable for resolution.
+
+        - If the path points to a folder, then the following steps are taken to find the right file with the right extension:
+            1. If the folder contains a file such as `package.json`, then fields specified in `config.resolve.mainFields` configuration option are looked up in order, and the first such field in `package.json` determines the file path.
+
+            1. If there is no file like `package.json`, or if the value of mainFields do not return a valid path, file names specified in the `resolve.mainFiles` configuration option are looked for in order, to see if a matching filename exists in the imported/required directory.
+
+            1. The file extension is then resolved in a similar way using the `resolve.extensions` option.
+
+        Webpack provides reasonable [defaults for these options](https://webpack.js.org/configuration/resolve) depending on your build target.
+
+    - The above points are the working of the Webpack resolver using its default configuration. Webpack provides reasonable defaults (e.g. where it searches for modules, using `package.json` etc), but many things can be configured by changing the value of the property `config.resolve`.
+
+        There are several overridable options specified for `config.resolve` in [the docs](https://webpack.js.org/configuration/resolve/); I will only be covering the ones we require for our TypeScript package setup. There are also a few properties which can be considered anti-patterns for our use-case, and should not be used.
+
+        1. `resolve.extensions` takes an array of the types of extensions Webpack should resolve. 
+        
+            If `resolve.enforceExtension` is left to its default value of `true`, this enables the issuer module to leave off the filename while importing the file (as we do in TypeScript). That is, the following:
+            ```js
+            import File from '../path/to/file'
+            ```
+            ...will correctly resolve to `../path/to/file.js`
+            
+            If the extension is not found in this list, _Webpack will not resolve it_. This means that if we specify this parameter as `config.resolve.extensions = ['.js', '.ts']`, an import such as 
+            ```js
+            import SomeFile from "./somefile.xyz"
+            ```
+            will _not_ be resolved (i.e. it won't be added to the dependency graph). To allow its resolution, we must include either `'.xyz'` or `'*'` in the array.
+             
+            Adding `'*'` to the array tells Webpack to try and resolve `import`/`require` statements for **all** filetypes. Whether these statements require the file string to be specified with an extension, depends on the value of `resolve.enforceExtension`.
+
+            The default value of this parameter is: 
+            ```js
+            config.resolve.extensions = [".js", ".json"];
+            ```
+
+            For our TypeScript project, we will include `.ts` to this list:
+            ```js
+            config.resolve.extensions = [".ts", ".js", ".json"];
+            ```
+        
+        1. `resolve.enforceExtension` is a boolean which does not allow extension-less files. 
+        
+            The default is false, meaning `require('./foo')` will work. Changing it to `true` means that all `import`/`require` statements need to specify file names along with the file extension, i.e. it must be `require('./foo.js')`.
+
+
+        1. `resolve.mainFiles`: 
+        
+            An array. If the path specified inside an `import`/`require` points to a directory, then we resolve that directory using the files specifies in the array `resolve.mainFiles`.
+
+            Default:
+            ```js
+            config.resolve.mainFiles = ["index"];
+            ```
+            This means that when we do `import ABCLib from "../src/ABCLib"`, we are actually resolving it as `import ABCLib from "../src/ABCLib/index`. Again, the file extensions only need to be specified if `resolve.enforceExtension` is `true`.
+
+        1. `resolve.descriptionFiles`: 
+
+            As mentioned earlier, the default behaviour while resolving a directory is to first check the if there is a `package.json` file in it. This file is called a _description file_ in Webpack nomenclature. We can override this behaviour with an array of description files to use via `resolve.descriptionFiles`. They must all be JSON files.
+
+            Default:
+            ```js
+            config.resolve.descriptionFiles = ["package.json"];
+            ```
+
+        1. `resolve.modules`:
+
+            - _Module paths_ are - as mentioned - paths passed to `import`/`require` statements which look like this:
+            
+                ```js
+                import "module";
+                import "module/lib/file";
+                ```
+                These paths are useful while specifying third-party libraries, since they can be used globally. The same syntax is used in Python.
+                
+                In our example TypeScript project, we use two third-party libraries, `jquery` and `typescript-collections`. We import them using the module-path syntax:
+                ```ts
+                /* Cataog.ts */
+                import { Set } from 'typescript-collections';
+                ...
+                ```
+                ```ts
+                /* main.ts */
+                import * as $ from "jquery";
+                ...
+                ```
+
+            - Now, in order to resolve these libraries, Webpack needs to know which folders they live in. For this purpose, we have the property `resolve.modules`.
+
+                By default, it is:
+                ```js
+                config.resolve.modules = ["node_modules"];
+                ```
+                Since we had previously installed our third-party libraries using `npm`:
+                ```bash
+                $ npm install --save-dev @types/jquery @types/typescript-collections
+                ``` 
+                ...they will be located in the `$PROJECT_ROOT/node_modules/` folder and Webpack will be able to resolve them by default.
+
+                Generally, this works out fine and dandy, and you can leave this property at the default setting. However, it is possible that you must use third-party modules that are not available via NPM, e.g. if you work in a tech company which has its own proprietary libraries. These won't be installed to `node_modules`. 
+                
+                In such a case, you must specify the folders in which the modules reside:
+
+                ```js
+                config.resolve.modules = ["node_modules", "external-libs/CompanyABCProprietaryLib"];
+                ```
+
+            - `resolve.modules` can specify folders using either Absolute or Relative paths.
+                1. A relative path will be scanned similarly to how Node by default scans for `node_modules`, by looking through the current directory as well as it's ancestors (i.e. `./node_modules`, `../node_modules`, and on), until the folder name is found, or we hit the root of the filesystem.
+
+                1. With an absolute path, it will only search in the given directory.
+
+            - The order of items in the `resolve.modules` array is important: if there are two different modules, both of which can satisfy the module-path specified in the `import`/`require` statement, then the one which is in the folder earlier in the `resolve.modules` array will be selected.
+
+                E.g. If you want to add a directory to search in that takes precedence over `node_modules/`:
+
+                ```js
+                config.resolve.modules = [path.resolve(__dirname, "src"), "node_modules"];
+                ```
+
+        1. [`resolve.alias`](https://webpack.js.org/configuration/resolve/#resolve-alias) is a property which allows us to create aliases for modules, so that we can `import`/`require` them more easily.
+
+            - For example, to alias a bunch of commonly used `src/` folders:
+                ```js
+                alias: {
+                Utilities: path.resolve(__dirname, 'src/utilities/'),
+                Templates: path.resolve(__dirname, 'src/templates/')
+                }
+                ```
+                Now, instead of using relative paths when importing like so:
+                ```js
+                import Utility from '../../utilities/utility';
+                ```
+                ...we can import them via module-paths:
+                ```js
+                import Utility from 'Utilities/utility';
+                ```
+
+            - In our example TypeScript project, my opinion is that using `resolve.alias` - while convenient - is an _anti-pattern_. I believe so for the following reasons:
+
+                1. These import statements are part of the source code, but their resolution criterion are defined in the build system. 
+                
+                    Such close coupling between a project's source and its build system should be avoided; if we later want to move to a different bundling framework (e.g. for performance reasons) then there is a lot of effort required to re-make these aliases in the syntax of the new framework. New errors may be introduced while doing so.
+
+
+                1. Our project has a flat project heirarchy, where every application-specific library folder is specified under `src/LibraryName`, e.g. `src/AnimalLib`, `src/CompanyLib`. There is no nesting of library folders.
+                
+                    For small-to-large sized projects (say, less than 50 libraries) this should be sufficient. Only if the project is extremely large (with hundreds of different folders under `src/`, handled by multiple teams) would it make sense to use nesting and alias the relative-paths to module-paths.
+
+                1. Using a custom aliasing format makes imports more confusing. Take the example provided in [the docs](https://webpack.js.org/configuration/resolve/#resolve-alias):
+
+                    ```js
+                    /* Exact match, so path/to/file.js is resolved and imported */
+                    import Test1 from 'xyz';
+
+                    /* Not an exact match, normal resolution takes place */
+                    import Test2 from 'xyz/file.js';    
+                    ```
+
+                    This sort of syntax is confusing, and on a large team with multiple developers, it is difficult to maintain a single standard, because everyone tends to use their own syntax, littering the code with inconsistent imports. This violates the KISS principle (Keep It Simple, Stupid) and, over the long term, reduces the overall readability of the code. 
+                    
+                1. Some IDEs may not be able to index the module you have aliased unless they are aware of Webpack configuraton syntax (which is itself evolving). This reduces code discoverability, a big loss while debugging errors.
+
+                Thus, using `resolve.alias` provides nothing more than syntactic sugar over the basic relative-path import functionality, and makes it difficult and cumbersome to migrate away from Webpack. Use it at your own risk.
+
+        1. We haven't used a `package.json` inside each of our TypeScript library modules (`AnimalLib`, `CompanyLib`, etc). If you are planning to do so, check out these config properties which you can modify:
+            - [`resolve.descriptionFiles`](https://webpack.js.org/configuration/resolve/#resolve-descriptionfiles)
+            - [`resolve.mainFields`](https://webpack.js.org/configuration/resolve/#resolve-mainfields)
+
+    - All loaders (either written by you, by someone else, or those part of the Webpack framework) are defined as modules, and must follow the standard [module resolution procedure](https://webpack.js.org/concepts/module-resolution/) in order to be used. There is a default config for this, but that does not support loaders that are outside the `node_modules` package. To resolve your custom loader so that it is usable, you must override [`config.resolveLoader`](https://webpack.js.org/configuration/resolve/#resolveloader). 
+        This set property takes values identical to the `config.resolve` property, but is used only to resolve webpack's loader packages. 
+
+        From [this doc](https://webpack.js.org/concepts/loaders/#loader-features):
+        > Normal modules can export a loader in addition to the normal main via package.json with the loader field. 
+
+        The default values of `resolveLoader` are:
+        ```js
+        config.resolveLoader = {
+            modules: [ 'node_modules' ],
+            extensions: [ '.js', '.json' ],
+            mainFields: [ 'loader', 'main' ]
+        };
+        ```
+        This config only resolves loaders located in `node_modules/`, i.e. those which were installed via `npm`.
+
+        Also see the field [`config.enforceModuleExtension`](https://webpack.js.org/configuration/resolve/#resolve-enforcemoduleextension)
+
+
+
+
+
+
+
+
