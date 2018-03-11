@@ -1139,15 +1139,19 @@ As stated from the main webpack site, the main goals of creating another module 
 
 
 
-## The working of Webpack
+## Webpack: concepts and configuration
 
-From the website [[1]](https://webpack.js.org/concepts/) [[2](https://webpack.js.org/concepts/loaders/)] (paraphrased):
+### Basic concepts:
 
-> At its core, webpack is a _static module bundler; when webpack processes your application, it builds a dependency graph by recursively including every module your application needs, then packages all of those modules into one or more bundles.
+From the website [[1](https://webpack.js.org/concepts/)] [[2](https://webpack.js.org/concepts/loaders/)] [[3](https://webpack.js.org/concepts/manifest/)] (paraphrased):
+
+> At its core, webpack is a _static module bundler_; when webpack processes your application, it builds a dependency graph by recursively including every module your application needs, then packages all of those modules into one or more bundles.
 >
 > An _entry point_ indicates which module(s) webpack should use to begin building the dependency graph. After entering the entry point, webpack will follow the trail of imports and discover which other modules and libraries that entry point depends on (directly and indirectly). Every such dependency is then processed and outputted into files called _bundles_.
 >
 > The _output_ field of the configuration js file, tells webpack where to emit the bundles it creates and how to name those bundle files. (You may see the term emitted or emit used throughout our documentation and plugin API. This is a fancy term for 'produced' or 'discharged').
+
+#### Loaders: 
 
 So far, it's similar to Browserify. A critical difference comes in the next section:
 
@@ -1170,6 +1174,28 @@ Loaders are basically transformers; they convert one file type into another befo
 In Browserify, loaders exist, but they are considered plugins for the framework. This leads to loaders having maintainers other than the Browserify team, which leads to the loaders being inconsistent with each other. Webpack removes this problem by exposing loaders as a core framework concept, in a separate category from other plugins.
 
 > While loaders are used to transform certain types of modules, _plugins_ can be leveraged to perform a wider range of tasks. Plugins range from bundle optimization and minification all the way to defining environment-like variables. The plugin interface is extremely powerful and can be used to tackle a wide variety of tasks.
+
+#### Runtime and Manifest
+
+([Source](https://webpack.js.org/concepts/manifest/))
+
+In a typical application or site built with webpack, there are three main types of code:
+
+1. The source code you, and maybe your team, have written.
+1. Any third-party library or "vendor" code your source is dependent on. In our example TypeScript application, these are `jquery` and `typescript-collections`.
+1. A _webpack runtime_ and _manifest_ that conducts the interaction of all modules.
+
+The runtime, along with the manifest data, is basically all the (JavaScript) code webpack needs to connect your modularized application while it's running in the browser. It contains the loading and resolving logic needed to connect your modules as they interact. It also contains the logic of whether to load a module upfront or lazy-load it. As a result, _the runtime is part of the JS code that goes to the client's browser_. It must go upfront (i.e. along with the HTML).
+
+The HTML sent to the client looks very different from the `src/` directory we had created; it contains references to several kinds of assets (JS, CSS, images, etc) via tags such as `<script src="...">`, `<link rel="stylesheet" type="text/css" href="...">`, etc. These bundles that are loaded, might be completely different from your source file(s).
+
+So how does webpack manage the interaction between all of your asset modules? This is where the manifest comes in. As the compiler enters, resolves, and maps out your application, it keeps detailed notes on all your modules. This collection of data is called the "Manifest" and it's what the runtime will use to resolve and load modules once they've been bundled and shipped to the browser. No matter which module syntax you have chosen, those `import`/`require` statements have now become `__webpack_require__` methods that point to module identifiers. Using the data in the manifest, the runtime will be able to find out where to retrieve the modules behind the identifiers. 
+
+The end result of this is the runtime and manifest code, which is re-created with every build. 
+
+You might ask, "How does this affect me? These are details of the Webpack framework...I'm just a consumer". Well, for simple applications, it won't; you can just allow everything to work auto-magically. However, if you decide to improve your projects performance by utilizing browser caching, this process will all of a sudden become an important thing to understand.
+
+I will go into depth on how to utilize the manifest and runtime once we get to the code-splitting, caching and lazy-loading section. For now, just know that these concepts exist.
 
 
 ### Webpack config file:
@@ -1780,6 +1806,141 @@ The [Webpack concepts doc](https://webpack.js.org/concepts/) is pretty clear on 
         Also see the field [`config.enforceModuleExtension`](https://webpack.js.org/configuration/resolve/#resolve-enforcemoduleextension)
 
 
+1. Plugins:
+
+    Source: [[1](https://webpack.js.org/concepts/plugins/)] [[2](https://webpack.js.org/configuration/plugins/)]
+
+    Like Browserify, Webpack also supports plugins. 
+    
+    **Unlike** Browserify, Webpack itself is built on the same plugin system that you use in your Webpack configuration! This also means that some plugins (like `CommonChunksPlugin`) eventually get pulled into the framework itself, meaning they will be given first-class maintainence support. This is the biggest differenting factor between Webpack and Browserify, and is an important reason for Webpack's wide adoption.
+
+    Plugins allow you configure the  dependency resolution and bundling process itself, unlike loaders which can only operate on the file-level.
+
+
+    - A webpack plugin is a JavaScript function that has an `apply` property. To this property we pass a function which takes as input a variable `compiler`, denoting the Webpack compiler. We register a callback on this compiler, which modifies the compilation lifecycle as it sees fit. 
+
+        When we use the plugin in our configuration via `new PluginName(args)`, the plugin's `apply` is called, and the registered callback is triggered. 
+
+        [Example](https://webpack.js.org/concepts/plugins/#anatomy).
+        
+        (Note that the plugin, while being a JavaScript function, is used as a class constructor; calling `new` essentially creates a new object of the that Plugin's class, and the parameters passed during this statements are similar to parameters passed to a constructor. This is how JavaScript's Prototype-based inheritance works).
+
+    - Plugins are used in the Webpack configuration via the `config.plugins` array. Each item in this array is an instantiation of a plugin. 
+
+        Simple Example:
+        ```js
+        config.plugins = [
+            new webpack.optimize.CommonsChunkPlugin({
+                ...
+            })
+        ];
+        ```
+
+        Complex example:
+        ```js
+        /* importing webpack to use plugins that are inbuilt */
+        var webpack = require('webpack');
+        /* importing plugins that do not come by default in webpack */
+        var ExtractTextPlugin = require('extract-text-webpack-plugin');
+        var DashboardPlugin = require('webpack-dashboard/plugin');
+
+        const config = {
+            ...
+        };
+
+        config.plugins= [
+            /* build optimization plugins */
+            new webpack.optimize.CommonsChunkPlugin({
+                name: 'vendor',
+                filename: 'vendor-[hash].min.js',
+            }),
+            new webpack.optimize.UglifyJsPlugin({
+                compress: {
+                warnings: false,
+                drop_console: false,
+                }
+            }),
+            new ExtractTextPlugin({
+                filename: 'build.min.css',
+                allChunks: true,
+            }),
+            new webpack.IgnorePlugin(/^\.\/locale$/, /moment$/),
+            
+            /* compile time plugins */
+            new webpack.DefinePlugin({
+                'process.env.NODE_ENV': '"production"',
+            }),
+            
+            /* webpack-dev-server enhancement plugins */
+            new DashboardPlugin(),
+            new webpack.HotModuleReplacementPlugin(),
+        ];
+        ```
+        The configuration syntax for a plugin is fairly straightforward. However, each plugin takes its own set of arguments, and you must go through the plugin's documentation to find out how to use it correctly. In the following sections, I shall only describe those which are useful in our example TypeScript project.
+    
+    - Some plugins are so widely used that the Webpack developers decide to make it a first-class feature of the framework. A great example is CommonChunksPlugin: [in Webpack 4 they removed the plugin entirely, in favour of config.optimization.splitChunks and config.optimization.runtimeChunk](https://gist.github.com/sokra/1522d586b8e5c0f5072d7565c2bee693). 
+        Unfortunately [they do not always keep the docs up to date with these new changes](https://github.com/webpack/webpack.js.org/issues/1897). This was an issue I faced in March 2018, when Webpack 4 was really new.
+
+
+1. Targets and multiple configurations:
+
+    Sources: [[1](https://webpack.js.org/concepts/targets/)] [[2](https://webpack.js.org/configuration/target/)]
+
+    Because JavaScript can be written for both server and browser, webpack offers multiple deployment targets that you can set in your webpack configuration. Each target has a variety options you can configure for that deployment/environment.
+
+    - The target is set in `config.target`, which takes a string or function value.  You _cannot_ have more than one target per `config` object.
+
+        1. From [all the string targets supported](https://webpack.js.org/configuration/target/#string), these are the ones we might possibly care about:
+
+         Target string | Description 
+        --- | ---
+        `web` | Compile for usage in a browser-like environment (default)
+        `node` | Compile for usage in a Node.js-like environment (uses Node.js `require` to load chunks and not touch any built in modules like `fs` or `path`)
+        `async-node` | Compile for usage in a Node.js-like environment (uses `fs` and `vm` to load chunks asynchronously)
+
+        As of March 2018, the docs are not complete with all the options available for each target; they recommend [reading the source code](https://github.com/webpack/webpack/blob/master/lib/WebpackOptionsApply.js), which is a pretty bad way to go about it. 
+        
+        Luckily for us, we are deploying to the browser, so we can use the default `web` target in our example TypeScript project.
+
+        1. To learn more about targets specified as functions, look [here](https://webpack.js.org/configuration/target/#function). We won't be using them.
+
+    - As mentioned, there is no way to have multiple targets. However, there _is_ a way to have multiple configurations in the same `webpack.config.js` file, each of which can have a different target. 
+    
+        - [It's a very simple feature in the configuration](https://webpack.js.org/concepts/targets/#multiple-targets):
+
+            ```js
+            /* webpack.config.js */
+            const config1 = { ... };
+            const config2 = { ... };
+
+            module.exports = [ config1, config2 ];
+            ```
+            Now, when we invoke `$ webpack`, both the configs are executed in order, and their output bundles are created.    
+
+        - This feature is insanely useful in the real world: we can create separate configurations for different devices, environments, etc.
+
+            - As a really simple example off the top of my head: you can have one config for the deskop view, another for the mobile view, and another for the app (if you use Webviews). 
+                
+                You might set it up so that each view might have a different entry point with some view-specific code, but all would rely on some common application library modules (`AnimalLib`, `CompanyLib`, etc). If you change one of these app modules, then all the view bundles depending on it will have to be rebuilt. Creating multiple configs allows you to rebuild them all in one single `$ webpack` invocation, rather than doing it manually.
+
+            - Another use-case is for devices with poor internet connections or low hardware specifications. In such cases, making multiple requests for JS/CSS resources is bad:
+
+                - The browser might slow down considerably if it has to make 7-8  parallel resource requests. This is especially a problem for embedded devices e.g. Raspberry Pi, Kindle devices, etc which have low RAM and CPU power.
+
+                - Assume your page requires resources A, B, C, D and E to work properly. Each of these is the same size (say, 200 KB).
+                - Say your userbase is mostly mobile users with bad internet connections; every 30 seconds, the internet goes out for a 5 second interval.
+                - Assume the internet speed is 100 KB/second (a real possibility for 3G mobile connections). 
+                - The best user experience is when the user does not see the page in an inconsistent state. Let's see how different bundling strategies will work out:
+
+                    1. If we make all resouces into a 1 MB bundle to load, it will take 10 seconds to load. In the worst case, the 10-second outage will occur at this time. So at max, it will take 15 seconds to load. The user will not see the page in an inconsistent state at all.
+
+                    1. If we distribute all resouces into separate 200KB bundles, each will take 2 seconds to load. Suppose we load the first two, then the 5-second outage happens. The page will be in an inconsistent state in between, and the user will try to interact with it, but can't (because all the bundles aren't loaded yet). Users will become frustrated, you will get unnecessary JavaScript errors on the console. 
+                        
+                        The situation can get worse: if, by random chance, we load the first two bundles (t=4 sec), then the internet goes out for five seconds (t=9 sec) then we load the next two (t=13 sec) then the internet goes out _again_ (t=18 sec) and then we load the last bundle (t=20 sec), the user will face much frustration with different elements on the page appearing at different times. If we had used one bundle, we take the same time (20 sec), but then everything appears at once and the app is ready to go.
+
+                    The first strategy is clearly better in this situation, especially if you show a loading bar / spinner while the bundle is being fetched (this has been shown to reduce user frustration).
+                
+                This may seem like a very niche use case, but the truth is that latency optimization is all about looking at your user base and finding which pattern works best for which subset of users. If the same users to visit your page often, then maybe caching is the right solution, even if the first time it loads a bit slowly. [Bundle splitting or aggregation](https://survivejs.com/webpack/building/bundle-splitting/) must be done on a case-by-case basis. In all cases though, the ability to have multiple Webpack configurations gives us a great amount of flexiblity.
 
 
 
