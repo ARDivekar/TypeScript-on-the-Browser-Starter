@@ -2,7 +2,14 @@
 const path = require('path');
 
 const config = {
-    entry: './src/main.ts',
+    entry: {
+        main : './src/main.ts',
+        main2: './src/main2.ts'
+    },
+    devtool: 'inline-source-map',
+    optimization: {
+        minimize: false
+    },
     module: {
         rules: [
             {
@@ -18,7 +25,7 @@ const config = {
         extensions: ['.ts', '.js', 'json']
     },
     output: {
-        filename: 'output.bundle.js',
+        filename: '[name].bundle.js',
         path: path.resolve(__dirname, 'build')
     }
 };

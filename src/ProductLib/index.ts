@@ -6,3 +6,5 @@ export { Price } from "./Price";
 export { Product } from "./Product";
 export { TShirt } from "./TShirt";
 export { TShirtSizes } from "./TShirtSizes";
+export { PhoneNumber } from "./PhoneNumber";
+export { MobilePhone } from "./MobilePhone";

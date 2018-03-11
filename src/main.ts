@@ -2,7 +2,7 @@ import * as $ from "jquery";
 
 
 import { Person, Organization, TechCompany } from "./CompanyLib"
-import { Order, TShirt, TShirtSizes, Catalog, Price, Currency } from "./ProductLib";
+import { Order, TShirt, TShirtSizes, Catalog, Price, Currency, MobilePhone, PhoneNumber } from "./ProductLib";
 
 let amazon = new TechCompany("Amazon", "amazon.com");
 
@@ -21,17 +21,17 @@ showEmployees();
     Hence, it should be overridden if we put objects in a Set<T>, or use them as a key in a
     Dictionary<K, T>, etc, or else those collections don't work.
 */
-let cocaCola = new Organization("Coca cola");
-let pepsi = new Organization("Pepsi");
+let cocaCola: Organization = new Organization("Coca cola");
+let pepsi: Organization = new Organization("Pepsi");
 console.log(pepsi.toString() == cocaCola.toString());
 
-let ralphLauren = new Organization("Ralph Lauren");
+let ralphLauren: Organization = new Organization("Ralph Lauren");
 let catalog: Catalog = new Catalog("Ralph Lauren sportswear");
 catalog.addProduct(new TShirt('Polo Shirt L', ralphLauren, new Price(10, Currency.USD), TShirtSizes.Large));
 catalog.addProduct(new TShirt('Polo Shirt M', ralphLauren, new Price(7, Currency.USD), TShirtSizes.Medium));
 catalog.addProduct(new TShirt('Polo Shirt S', ralphLauren, new Price(5, Currency.USD), TShirtSizes.Small));
 console.log(catalog.toString());
-let o = new Order();
+let o: Order = new Order();
 o.addItem(catalog.selectProductFromCatalog(1), 1);
 o.addItem(catalog.selectProductFromCatalog(3), 5);
 o.purchase();
