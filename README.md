@@ -2117,3 +2117,115 @@ The [Webpack concepts doc](https://webpack.js.org/concepts/) is pretty clear on 
 
     ![Debugging TypeScript minified and source-mapped using Webpack. All debugging options are avialble.](img/TypeScript-Webpack-main-CompanyLib-ProductLib-debugging-with-sourcemaps.jpg)
 
+
+
+### A (not-so) basic Webpack configuration:
+
+Lets put together everything we learnt in the above sections, and create a webpack config file for our example TypeScript project. 
+
+It should do the following things:
+- We will have two entry points, `main.ts` and `main2.ts`. They are independent of each other.
+- We will use `awesome-typescript-loader` to convert all TypeScript files into JavaScript. As a result, we will have to resolve `.ts` in addition to `.js` and `.json`.
+- We will make two bundles that we include in `src/index.html` and `src/index2.html`, respectively: 
+    - `build/main.bundle.js` will contain the transpiled code of:
+        - `src/main.ts`
+        - All code inside the application libraries `src/CompanyLib/` and `src/ProductLib/`.
+        - All code inside the vendor libraries `jquery` and `typescript-collections`.
+    - `build/main2.bundle.js` will contain the transpiled code of:
+        - `src/main2.ts`
+        - All code inside the application library `src/AnimalLib/`.
+    
+- We will have separate commands for development and production builds, using our custom command line argument `--env`. So we will be able to invoke either `$ webpack --env prod` or `$ webpack --env dev`. It is necessary to specify one of these environments, or an Exception will be raised.
+    - For development, we will have inline sourcemaps and no minification. 
+    - For production, we will have minification and no sourcemaps (the default setup for Webpack 4).
+
+    Note: the command line argument is possible since [Webpack allows `webpack.config.js` to export a fuction that returns the config](https://webpack.js.org/configuration/configuration-types/#exporting-a-function). The function takes as input two parameters: `env` and `argv`. The former allows us to [set the environment from the CLI in a variety of ways](https://webpack.js.org/api/cli/#environment-options), while the latter allows us to add custom CLI parameters.
+
+- We want verbose command line output. There are a number of [options you can configure](https://webpack.js.org/configuration/stats/#stats) in `config.stats` to enable this. We will use these to trigger the following:
+    - A grouping of all the modules in each chunk. Chunks are sorted by size.
+    - A basic dependency graph, where if is easily visible can see which module triggered the importing of another. This is done by enabling and sorting by module depth.
+    - No warnings (`stats.warnings = false;`).
+    - Show colors (`stats.colors = true;`).
+
+The following is the config that satisfies all our requirements:
+```js
+/* webpack.config.js */
+const path = require('path');
+
+module.exports = function(env, argv){
+    const config = {
+        entry: {
+            main : './src/main.ts',
+            main2: './src/main2.ts'
+        },
+        module: {
+            rules: [
+                {
+                    resource: {
+                        test: /\.ts$/,
+                        exclude: /node_modules/,
+                    },
+                    use: 'awesome-typescript-loader',
+                }
+            ]
+        },
+        resolve: {
+            extensions: ['.ts', '.js', 'json']
+        },
+        output: {
+            filename: '[name].bundle.js',
+            path: path.resolve(__dirname, 'build')
+        }
+    };
+    if (env == undefined){
+        throw "ERROR: No environment option specified!";
+    }
+    else if (env === 'dev' || env.dev === true || env === 'devo' || env.devo === true || env === 'development' || env.development === true){
+        /* Development-specific config here. */
+        config.devtool = 'inline-source-map';
+        config.optimization = {
+            minimize: false
+        };
+        console.log("==================================================");
+        console.log("Generating development-specific configuration.");
+        console.log("==================================================");
+    }
+    else if (env === 'prod' || env.prod === true || env === 'production' || env.production === true) {
+        /* Producion-specific config here. */
+        console.log("==================================================");
+        console.log("Generating production-specific configuration.");
+        console.log("==================================================");
+    }
+    else {
+        throw "ERROR: Invalid environment option specified!";
+    }
+
+    /* Extra command-line description that should be shown or hidden: */
+    config.stats = {
+        /* Stats for the entire build */
+        env: true, 
+        performance: true,
+        timings: true,
+        hash : true,
+        warnings: false,
+        colors: true,
+        
+        /* Chunk-specific stats: */
+        chunks: true,
+        chunksSort: "size",
+        entrypoints: true,
+
+        /* Module-specific stats: */
+        modules: true,
+        maxModules: 1000,
+        depth: true,
+        modulesSort: "depth",
+        reasons : false,
+        excludeModules: function(){return false;} /* Show all hidden modules. */
+    };
+
+    /* config.stats = "verbose"; */
+
+    return config;
+}
+```
