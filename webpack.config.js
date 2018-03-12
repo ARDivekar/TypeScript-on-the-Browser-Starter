@@ -4,8 +4,45 @@ const path = require('path');
 module.exports = function(env, argv){
     const config = {
         entry: {
-            main : './src/main.ts',
-            main2: './src/main2.ts'
+            main: "./src/main.ts",
+            main2: "./src/main2.ts",
+        },
+        optimization:{
+            splitChunks: {
+                cacheGroups: {
+                    AnimalLib: {
+                        test: new RegExp('AnimalLib' + '\\' + path.sep + '.*.ts'),
+                        chunks: "initial",
+                        name: "AnimalLib",
+                        enforce: true,
+                        
+                    },
+                    CompanyLib: {
+                        test: new RegExp('CompanyLib' + '\\' + path.sep + '.*.ts'),
+                        chunks: "initial",
+                        name: "CompanyLib",
+                        enforce: true
+                    },
+                    ProductLib: {
+                        test: new RegExp('ProductLib' + '\\' + path.sep + '.*.ts'),
+                        chunks: "initial",
+                        name: "ProductLib",
+                        enforce: true
+                    },
+                    jquery: {
+                        test: new RegExp('node_modules' + '\\' + path.sep + 'jquery.*'),
+                        chunks: "initial",
+                        name: "jquery",
+                        enforce: true
+                    },
+                    typescript_collections: {
+                        test: new RegExp('node_modules' + '\\' + path.sep + 'typescript-collections.*'),
+                        chunks: "initial",
+                        name: "typescript_collections",
+                        enforce: true
+                    }
+                }
+            }
         },
         module: {
             rules: [
@@ -32,9 +69,7 @@ module.exports = function(env, argv){
     else if (env === 'dev' || env.dev === true || env === 'devo' || env.devo === true || env === 'development' || env.development === true){
         /* Development-specific config here. */
         config.devtool = 'inline-source-map';
-        config.optimization = {
-            minimize: false
-        };
+        config.optimization.minimize = false;
         console.log("==================================================");
         console.log("Generating development-specific configuration.");
         console.log("==================================================");
