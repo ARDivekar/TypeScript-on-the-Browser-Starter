@@ -1,6 +1,5 @@
+/* main.ts */
 import * as $ from "jquery";
-
-
 import { Person, Organization, TechCompany } from "./CompanyLib"
 import { Order, TShirt, TShirtSizes, Catalog, Price, Currency, MobilePhone, PhoneNumber } from "./ProductLib";
 
