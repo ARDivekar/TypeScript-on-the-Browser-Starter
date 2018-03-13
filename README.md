@@ -2213,3 +2213,185 @@ module.exports = function(env, argv){
     return config;
 }
 ```
+
+
+
+## Optimizing your Webpack bundles:
+
+This section (finally) talks about how to bundle your application libraries so that your users can cache it on their browsers.
+
+We will also discuss other methods of improving the user experience via Webpack.
+
+Before we start, we need to explain some Webpack concepts:
+1. A _chunk_ is a group of modules (i.e. files). They may or may not depend on one another.
+1. Each chunk has a name and an id.
+1. Chunks can be combined into fewer chunks.
+1. Chunks can be split into more chunks (so long as there is at least one module in the chunk).
+1. After the dependency graph is parsed, chunks are combined/split, etc, the final set of chunks is written to disk, with each chunk as one bundle.
+
+### Caching application library bundles
+
+Webpack 3 had you messing with things like `CommonsChunkPlugin`.
+With Webpack 4, bundle-splitting becomes quite simple: we must use `config.optimization.splitChunks.cacheGroups`. This takes as input a JSON object, each key of which is a separate bundle that you want to create. The entry points are also created as separate bundles.
+```js
+const config = {
+    entry: {
+        main: "./src/main.ts",
+        main2: "./src/main2.ts",
+    },
+    optimization:{
+        splitChunks: {
+            cacheGroups: {
+                AnimalLib: {
+                    test: new RegExp('AnimalLib' + '\\' + path.sep + '.*.ts'),
+                    chunks: "initial",
+                    name: "AnimalLib",
+                    enforce: true,
+                    
+                },
+                CompanyLib: {
+                    test: new RegExp('CompanyLib' + '\\' + path.sep + '.*.ts'),
+                    chunks: "initial",
+                    name: "CompanyLib",
+                    enforce: true
+                },
+                ProductLib: {
+                    test: new RegExp('ProductLib' + '\\' + path.sep + '.*.ts'),
+                    chunks: "initial",
+                    name: "ProductLib",
+                    enforce: true
+                },
+                jquery: {
+                    test: new RegExp('node_modules' + '\\' + path.sep + 'jquery.*'),
+                    chunks: "initial",
+                    name: "jquery",
+                    enforce: true
+                },
+                typescript_collections: {
+                    test: new RegExp('node_modules' + '\\' + path.sep + 'typescript-collections.*'),
+                    chunks: "initial",
+                    name: "typescript_collections",
+                    enforce: true
+                }
+            }
+        }
+    },
+    module: {
+        rules: [
+            {
+                resource: {
+                    test: /\.ts$/,
+                    exclude: /node_modules/,
+                },
+                use: 'awesome-typescript-loader',
+            }
+        ]
+    },
+    resolve: {
+        extensions: ['.ts', '.js', 'json']
+    },
+    output: {
+        filename: '[name]-[chunkhash:6].bundle.js',
+        path: path.resolve(__dirname, 'build')
+    }
+};
+```
+This config is parsed by Webpack as follows:
+1. We enter at `main.ts`, then start building the dependency graph of all its dependencies (`Product.ts`, `jquery`, `Organization.ts`, `typescript-collections`, etc)
+1. We enter at `main2.ts`, then start building the dependency graph of all its dependencies (`Cat.ts`, `Dog.ts`).
+1. From these two dependency graphs, we say:
+    1. All those modules matching the path `CompanyLib/.*.ts`, go into one chunk named `CompanyLib`, which (because we specify `output.filename = '[name].bundle.js'`) is subsequently written to `CompanyLib.build.js`.
+    1. The same happens for `AnimalLib` and `ProductLib`.
+    1. All modules matching the path `node_modules/jquery.*` go into one chunk named `jquery`, which is subsequently written to `jquery.bundle.js`.
+    1. The same happens for `node_modules/typescript-collecions`: it goes into `typescript_collections.bundle.js`.
+1. Each entry file goes into its own chunk and bundle.
+
+Note: I used `'\\' + path.sep` because `'/'` does not work on Windows. On UNIX systems, you might want to experiment to find out what works.
+
+When we put the above in our previous `webpack.config.js` and run `$ webpack --env prod`, we get the following output:
+```
+==================================================
+Generating production-specific configuration.
+==================================================
+
+[at-loader] Checking started in a separate process...
+
+[at-loader] Ok, 0.261 sec.
+Hash: 787fff911cee68afd06c
+Version: webpack 4.1.0
+Time: 2208ms
+Built at: 2018-3-14 00:55:43
+Environment (--env): "prod"
+                                  Asset      Size  Chunks             Chunk Names
+                jquery-6c5dbc.bundle.js  84.5 KiB       0  [emitted]  jquery
+            CompanyLib-d97a47.bundle.js  1.65 KiB       1  [emitted]  CompanyLib
+             AnimalLib-b9d09f.bundle.js  1.32 KiB       2  [emitted]  AnimalLib
+            ProductLib-e46420.bundle.js  4.17 KiB       3  [emitted]  ProductLib
+typescript_collections-ee138a.bundle.js  27.8 KiB       4  [emitted]  typescript_collections
+                 main2-abc3b7.bundle.js  1.27 KiB       5  [emitted]  main2
+                  main-e5d5f4.bundle.js   2.1 KiB       6  [emitted]  main
+Entrypoint main = typescript_collections-ee138a.bundle.js ProductLib-e46420.bundle.js CompanyLib-d97a47.bundle.js jquery-6c5dbc.bundle.js main-e5d5f4.bundle.js
+Entrypoint main2 = AnimalLib-b9d09f.bundle.js main2-abc3b7.bundle.js
+```
+
+Now, we have separate bundles which we can import separately from different HTML files:
+```html
+<!-- src/index.html -->
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8" />
+        <title>Hello TypeScript!</title>
+    </head>
+    <body>
+        <p id="employees">EMPTY</p>
+        <script src="../build/jquery.bundle.js"></script>
+        <script src="../build/typescript_collections.bundle.js"></script>
+        <script src="../build/ProductLib.bundle.js"></script>
+        <script src="../build/CompanyLib.bundle.js"></script>
+        <script src="../build/main.bundle.js"></script>
+    </body>
+</html>
+```
+```html
+<!-- src/index2.html -->
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8" />
+        <title>Hello TypeScript!</title>
+    </head>
+    <body>
+        <script src="../build/main2.bundle.js"></script>
+        <script src="../build/AnimalLib.bundle.js"></script>
+    </body>
+</html>
+```
+One awesome thing here is that the order of the imports _does not matter_! You can swap them around and try for yourself.
+
+If you remove one of the imports, all code bundles depending on it will silently fail, to be careful.
+
+Note: in the config, we had specified the chunkhash in the output bundle name. This is for demonstation purposes only: if I make a small change in CompanyLib/Organization.ts (which is depended on by multiple other files) and then re-compile, I get:
+
+```
+[at-loader] Checking started in a separate process...
+
+[at-loader] Ok, 0.28 sec.
+Hash: 5875a60095271f85477e
+Version: webpack 4.1.0
+Time: 2155ms
+Built at: 2018-3-14 01:01:39
+Environment (--env): "prod"
+                                  Asset      Size  Chunks             Chunk Names
+                jquery-6c5dbc.bundle.js  84.5 KiB       0  [emitted]  jquery
+            CompanyLib-6db0e4.bundle.js  1.59 KiB       1  [emitted]  CompanyLib
+             AnimalLib-b9d09f.bundle.js  1.32 KiB       2  [emitted]  AnimalLib
+            ProductLib-e46420.bundle.js  4.17 KiB       3  [emitted]  ProductLib
+typescript_collections-ee138a.bundle.js  27.8 KiB       4  [emitted]  typescript_collections
+                 main2-abc3b7.bundle.js  1.27 KiB       5  [emitted]  main2
+                  main-e5d5f4.bundle.js   2.1 KiB       6  [emitted]  main
+Entrypoint main = typescript_collections-ee138a.bundle.js ProductLib-e46420.bundle.js CompanyLib-6db0e4.bundle.js jquery-6c5dbc.bundle.js main-e5d5f4.bundle.js
+Entrypoint main2 = AnimalLib-b9d09f.bundle.js main2-abc3b7.bundle.js
+```
+
+If you notice carefully, _only the hash of the CompanyLib bundle has changed_. The others are unaffected! This means that users can cache those bundles if `Organization.ts` changes between two user sessions, even though those bundles depdend on `Organization.ts`.
