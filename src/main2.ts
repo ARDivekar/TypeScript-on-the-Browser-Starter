@@ -1,5 +1,6 @@
 /* main2.ts */
-import {Cat, Dog} from "./AnimalLib";
+import { Cat } from "./AnimalLib/Cat";
+import { Dog } from "./AnimalLib/Dog";
 
 let c: Cat = new Cat("Mittens", new Date());
 console.log(c.makeNoise());

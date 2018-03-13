@@ -1,7 +1,7 @@
 import { Product } from "./Product";
 import { Price } from "./Price";
 import { TShirtSizes } from "./TShirtSizes";
-import { Organization } from "../CompanyLib";
+import { Organization } from "../CompanyLib/Organization";
 
 export class TShirt extends Product{
     constructor(

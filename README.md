@@ -124,13 +124,11 @@ Let's set up the project structure:
     src
     |
     |-- CompanyLib  // a library folder
-    |   |-- index.ts
     |   |-- Person.ts
     |   |-- Organization.ts
     |   |-- TechCompany.ts
     |
     |-- ProductLib  // a library folder
-    |   |-- index.ts
     |   |-- Currency.ts
     |   |-- Price.ts
     |   |-- Product.ts
@@ -728,7 +726,7 @@ If your web application is just one page, then maybe it's okay to minify all you
 
 ### Structure of a modular TypeScript codebase:
 
-So now, let's get started with creating multiple JS files from each module. This is a bit tricky, so I will start with a simpler codebase with a single module, `src/AnimalLib/`, which is consumed by `src/main2.ts`. On transpilation, these become `build/AnimalLib-min.js` and `build/main2-min.js`, respectively. The HTML file `index2.html` will import them (in the correct order):
+So now, let's get started with creating multiple JS files from each module. This is a bit tricky, so I will start with a simpler codebase with a single module, `src/AnimalLib/`, which is consumed by `src/main2.ts`. On transpilation, these become `build/AnimalLib.bundle.js` and `build/main2.bundle.js`, respectively. The HTML file `index2.html` will import them:
     
 ```html
 <!-- src/index2.html -->
@@ -739,8 +737,8 @@ So now, let's get started with creating multiple JS files from each module. This
         <title>Hello TypeScript!</title>
     </head>
     <body>
-        <script src="../build/AnimalLib-min.js"></script>
-        <script src="../build/main2-min.js"></script>
+        <script src="../build/AnimalLib.bundle.js"></script>
+        <script src="../build/main2.bundle.js"></script>
     </body>
 </html>
 ```
@@ -749,7 +747,6 @@ AnimalLib is a module of source code, meaning it is a directory. After much expe
 src
 |
 |-- AnimalLib  // a library folder
-|   |-- index.ts
 |   |-- Animal.ts
 |   |-- Cat.ts
 |   |-- Dog.ts
@@ -757,49 +754,16 @@ src
 
 `Animal.ts` exports and abstract class `Animal`, which is consumed by concrete classes `Dog` and `Cat`.
 
-This look similar to the structure of `CompanyLib` and `ProductLib`, doesn't it? And it is, with one crucial difference: now, each of the classes inside the [file-level modules](https://basarat.gitbooks.io/typescript/docs/project/external-modules.html) `Animal.ts`, `Cat.ts` and `Dog.ts` is [re-exported](https://www.typescriptlang.org/docs/handbook/modules.html#re-exports) via `AnimalLib/index.ts`:
-
-```ts
-/* AnimalLib/index.ts */
-export { Animal } from "./Animal";
-export { Cat } from "./Cat";
-export { Dog } from "./Dog";
-```
-Now, instead of importing each file individually, we can import them all in one go:
-```ts
-/* main2.ts */
-import { Cat, Dog } from "./AnimalLib";
-let c: Cat = new Cat("Mittens", new Date());
-let d = new Dog("Coco", new Date())
-console.log(c.makeNoise());
-console.log(d.makeNoise());
-```
-This feature of "importing folders as modules" is allowed by [TypeScript's module import resolution strategy](https://basarat.gitbooks.io/typescript/docs/project/external-modules.html#module-paths): folders become modules when we specify an `index.ts` file inside them. That `index.ts` is responsible for re-exporting the exported members of the different `*.ts` files located inside the folder. If, later, we add the file `AnimalLib/Snake.ts`, we will also have to modify `AnimalLib/index.ts` to export `Snake` explicitly, or consumers won't be able to use it when importing the folder.
-
-In the build system set up that follows, _it is important to use the above import syntax and not any other_. For example **don't** do this:
-```ts
-/* main2.ts */
-import { Cat } from "./AnimalLib/Cat";
-import { Dog } from "./AnimalLib/Dog";
-```
-There won't any syntax or compilation errors, but now the file `main2-min.js` will contain the code of the `Cat` and `Dog` classes, which should ideally only be present in `AnimalLib-min.js`. If you keep using the this import syntax rather than the recommended one, you will find your minified file sizes balooning, due to extra dependencies being added unnecessarily.
-
-Note that the above point does not apply to external libraries like `jQuery`, because the build system handles them differently. You can import them however you want.
-
-### Setting up multiple dependent libraries:
-
-We can structure our other libraries in the same way:
+This is similar to the structure of `CompanyLib` and `ProductLib`.
 ```
 src
 |
 |-- CompanyLib  // a library folder, becomes a single js bundle.
-|   |-- index.ts
 |   |-- Person.ts
 |   |-- Organization.ts
 |   |-- TechCompany.ts
 |
 |-- ProductLib  // a library folder, becomes a single js bundle.
-|   |-- index.ts
 |   |-- Currency.ts
 |   |-- Price.ts
 |   |-- Product.ts
@@ -819,7 +783,7 @@ These are consumed by `main.ts`, just as `AnimalLib` was consumed by `main2.ts`.
 
 Here is the dependency graph between all the modules: 
 
-![TypeScript module dependency graph for the current project. Both main.ts and ProductLib depend on CompanyLib, and import it via index.ts. AnimalLib is only depended on by main2.ts](img/Module-Dependency-Graph.jpg)
+![TypeScript module dependency graph for the current project. Both main.ts and ProductLib depend on classes inside CompanyLib. AnimalLib is only depended on by main2.ts](img/Module-Dependency-Graph.jpg)
 
 Note: this graph was generated by the awesome tool [dependency-cruiser](https://github.com/sverweij/dependency-cruiser)). The command to generate it is:
 ```
@@ -843,6 +807,13 @@ So, our build system should generate the following bundles:
 
 By setting up our project like this, we make a few important assumptions about how our web application will be structured and used:
 
+- **There is a significant amount of code in the application libraries.**
+
+    If all the application library code put together is a small fraction of the size of the total code size, then it might be a waste of effort to over-optimize the caching of the application library bundles. Just put everything in one bundle, even if the client must reload it every time.
+
+    However, you should always minify and cache large vendor libraries. "Large" is subjective: the Webpack size warning is triggered at 30 KB. Look for data on your users' hardware specifications (network speed, device CPU, RAM) to see what is acceptable.
+
+
 - **Different pages in our web app will require a single entry file but different application and vendor library bundles.** 
 
     E.g.
@@ -860,7 +831,9 @@ By setting up our project like this, we make a few important assumptions about h
 
 - **The dependency graph of application libraries is relatively stable.**
 
-    The libraries should be well modularized from each other, and if LibraryABC imports 
+    Over time, as we add more features, a particular application library will use more and more features of another application/vendor library, but we expect the larger the dependency graph between application and vendor libraries will be fairly constant. So, by making each application library a separate bundle, the client can cache entire application libraries. 
+    
+    To allow this, we must ensure that a change in the code of a particular application library will not affect the output bundle of any of its dependents.
 
 - **Users will visit the page(s) frequently.**
 
@@ -918,102 +891,214 @@ Unfortunately, this was as far as I got with Browserify. I spent a multiple days
 
 1. I tried [adding `exclude` params to the tsify call](https://github.com/TypeStrong/tsify), but that didn't work at all.
 
-1. I tried just [excluding `src/**/index.ts` in the `tsconfig.json`](http://www.typescriptlang.org/docs/handbook/tsconfig-json.html), but tsify seemed to ignore it.
-
 1. [I tried setting up my TypeScript modules to use Browserify's `external` and `require` functions, using these links as reference points: [[1](https://benclinkinbeard.com/posts/how-browserify-works/)] [[2](https://github.com/vigetlabs/blendid/issues/75)] [[3](https://github.com/browserify/browserify/issues/1014)] [[4](https://lincolnloop.com/blog/speedy-browserifying-multiple-bundles/)] [[5](https://benclinkinbeard.com/posts/external-bundles-for-faster-browserify-builds/)] [[6](https://github.com/browserify/browserify#multiple-bundles)]. 
 
-    I did actually get this to work upto an extent using this gulp setup:
+    I did actually get this to work upto an extent using this gulp setup, and by augmenting `AnimalLib` with an `index.ts` file:
+    ```ts
+    /* AnimalLib/index.ts */ 
+    export { Animal } from "./Animal"; 
+    export { Cat } from "./Cat"; 
+    export { Dog } from "./Dog"; 
+    console.log("Exported AnimalLib.");
+    ```
+    Note: this feature of "importing folders as modules" is allowed by [TypeScript's module import resolution strategy](https://basarat.gitbooks.io/typescript/docs/project/external-modules.html#module-paths): folders become modules when we specify an `index.ts` file inside them. This particulat `index.ts` is responsible for re-exporting the exported members of the different `*.ts` files located inside the folder. If, later, we add the file `AnimalLib/Snake.ts`, we will also have to modify `AnimalLib/index.ts` to export `Snake` explicitly, or consumers won't be able to use it when importing the folder. 
     
-    - We create the bundle `build/AnimalLib.js` from the folder `src/AnimalLib/`, and expose it in the browser via the global string `./AnimalLib`:
+    Now, we create the bundle `build/AnimalLib.js` from the folder `src/AnimalLib/`, and expose it in the browser via the global string `./AnimalLib`:
+
+    ```js
+    /* gulp/ts-browserify-animal-module.ts */
+    var gulp = require('gulp'),
+        browserify = require('browserify'),
+        tsify = require("tsify"),
+        source = require('vinyl-source-stream'),
+        buffer = require('vinyl-buffer'),
+        sourcemaps = require('gulp-sourcemaps'),
+        transform = require('vinyl-transform');
+
+    module.exports = function (
+        SOURCE_DIR,
+        BUILD_DIR,
+        SOURCE_MAPS_DIR
+    ) {
+        var entries = [
+            SOURCE_DIR + '/' + 'AnimalLib/index.ts'
+        ]
+        gulp.task('ts-browserify-animal-module', function () {
+            return browserify()
+            .require(
+                './' + SOURCE_DIR + '/' + 'AnimalLib/index.ts', 
+                { expose: './AnimalLib' }
+            )
+            .plugin(tsify)
+            .on('dep', function (dep) {
+                console.log("Included in bundle: " + dep.file);
+            })
+            .bundle()
+            .pipe(source("AnimalLib.js"))
+            .pipe(gulp.dest(BUILD_DIR));
+        });
+    }
+    ```
+
+    Now, we build `main2.ts`, which imports files from the folder-module `AnimalLib`. To do so, we create a gulp task `ts-browserify-main2`, which will first clean the `src/` and `build/` folders of `*.js` files, and then invoke the task `ts-browserify-animal-module` that was defined above.
+    
+    Inside this task, we use the plugin `.external('src/AnimalLib/index.ts)'` to tell browserify not to include the files in `src/AnimalLib/`, to the bundle `build/main2.js`.
+
+    ```js
+    /* gulp/ts-browserify-main2.ts */
+    var gulp = require('gulp'),
+        browserify = require('browserify'),
+        tsify = require("tsify"),
+        source = require('vinyl-source-stream'),
+        buffer = require('vinyl-buffer'),
+        fs = require('fs'), 
+        factor = require('factor-bundle'),
+        sourcemaps = require('gulp-sourcemaps');
+
+    module.exports = function (
+        SOURCE_DIR,
+        BUILD_DIR,
+        SOURCE_MAPS_DIR
+    ) {
+        gulp.task('ts-browserify-main2', ['js-clean-src', 'clean-build', 'ts-browserify-animal-module'], function () {
+            return browserify()
+            .add(SOURCE_DIR + '/' + 'main2.ts')
+            .plugin(tsify)
+            .external('./' + SOURCE_DIR + '/' + 'AnimalLib/index.ts')
+            .on('dep', function (dep) {
+                console.log("Included in bundle: " + dep.file);
+            })
+            .bundle()
+            .pipe(source("main2.js"))
+            .pipe(gulp.dest(BUILD_DIR));
+        });
+    }
+    ```
+
+    We import these into the gulpfile:
+    ```js
+    var SOURCE_DIR = 'src';
+    var BUILD_DIR = 'build';
+    var SOURCE_MAPS_DIR = 'sourcemaps';
+
+    require('./gulp/ts-browserify-animal-module')(
+        SOURCE_DIR, 
+        BUILD_DIR,
+        SOURCE_MAPS_DIR
+    );
+
+    require('./gulp/ts-browserify-main2')(
+        SOURCE_DIR, 
+        BUILD_DIR,
+        SOURCE_MAPS_DIR
+    );
+    ```
+
+    Let's take a look at the output bundles:
+
+    1. `build/main2.js`:
         ```js
-        /* gulp/ts-browserify-animal-module.ts */
-        var gulp = require('gulp'),
-            browserify = require('browserify'),
-            tsify = require("tsify"),
-            source = require('vinyl-source-stream'),
-            buffer = require('vinyl-buffer'),
-            sourcemaps = require('gulp-sourcemaps'),
-            transform = require('vinyl-transform');
+        (function(){function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s}return e})()({1:[function(require,module,exports){
 
-        module.exports = function (
-            SOURCE_DIR,
-            BUILD_DIR,
-            SOURCE_MAPS_DIR
-        ) {
-            var entries = [
-                SOURCE_DIR + '/' + 'AnimalLib/index.ts'
-            ]
-            gulp.task('ts-browserify-animal-module', function () {
-                return browserify()
-                .require(
-                    './' + SOURCE_DIR + '/' + 'AnimalLib/index.ts', 
-                    { expose: './AnimalLib' }
-                )
-                .plugin(tsify)
-                .on('dep', function (dep) {
-                    console.log("Included in bundle: " + dep.file);
-                })
-                .bundle()
-                .pipe(source("AnimalLib.js"))
-                .pipe(gulp.dest(BUILD_DIR));
-            });
-        }
+        "use strict";
+        exports.__esModule = true;
+        /* main2.ts */
+        var AnimalLib_1 = require("./AnimalLib");
+        var c = new AnimalLib_1.Cat("Mittens", new Date());
+        console.log(c.makeNoise());
+        var d = new AnimalLib_1.Dog("Coco", new Date());
+        console.log(d.makeNoise());
+
+        },{"./AnimalLib":undefined}]},{},[1]);
         ```
-    - Now, we build `main2.ts`, which imports files from the folder-module `AnimalLib`. To do so, we create a gulp task `ts-browserify-main2`, which will first clean the `src/` and `build/` folders of `*.js` files, and then invoke the task `ts-browserify-animal-module` that was defined above.
-        Inside this task, we use the plugin `.external('src/AnimalLib/index.ts)'` to tell browserify not to include the files in `src/AnimalLib/`, to the bundle `build/main2.js`.
+    2. `build/AnimalLib.js`
         ```js
-        /* gulp/ts-browserify-main2.ts */
-        var gulp = require('gulp'),
-            browserify = require('browserify'),
-            tsify = require("tsify"),
-            source = require('vinyl-source-stream'),
-            buffer = require('vinyl-buffer'),
-            fs = require('fs'), 
-            factor = require('factor-bundle'),
-            sourcemaps = require('gulp-sourcemaps');
+        require=(function(){function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s}return e})()({"./AnimalLib":[function(require,module,exports){
 
-        module.exports = function (
-            SOURCE_DIR,
-            BUILD_DIR,
-            SOURCE_MAPS_DIR
-        ) {
-            gulp.task('ts-browserify-main2', ['js-clean-src', 'clean-build', 'ts-browserify-animal-module'], function () {
-                return browserify()
-                .add(SOURCE_DIR + '/' + 'main2.ts')
-                .plugin(tsify)
-                .external('./' + SOURCE_DIR + '/' + 'AnimalLib/index.ts')
-                .on('dep', function (dep) {
-                    console.log("Included in bundle: " + dep.file);
-                })
-                .bundle()
-                .pipe(source("main2.js"))
-                .pipe(gulp.dest(BUILD_DIR));
-            });
-        }
+        "use strict";
+        exports.__esModule = true;
+        /* AnimalLib/index.ts */
+        var Animal_1 = require("./Animal");
+        exports.Animal = Animal_1.Animal;
+        var Cat_1 = require("./Cat");
+        exports.Cat = Cat_1.Cat;
+        var Dog_1 = require("./Dog");
+        exports.Dog = Dog_1.Dog;
+
+        },{"./Animal":1,"./Cat":2,"./Dog":3}],1:[function(require,module,exports){
+        "use strict";
+        exports.__esModule = true;
+        var Animal = /** @class */ (function () {
+            function Animal(name, dob) {
+                this.name = name;
+                this.dob = dob;
+            }
+            return Animal;
+        }());
+        exports.Animal = Animal;
+
+        },{}],2:[function(require,module,exports){
+        "use strict";
+        var __extends = (this && this.__extends) || (function () {
+            var extendStatics = Object.setPrototypeOf ||
+                ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+                function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+            return function (d, b) {
+                extendStatics(d, b);
+                function __() { this.constructor = d; }
+                d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+            };
+        })();
+        exports.__esModule = true;
+        var Animal_1 = require("./Animal");
+        var Cat = /** @class */ (function (_super) {
+            __extends(Cat, _super);
+            function Cat(name, dob) {
+                return _super.call(this, name, dob) || this;
+            }
+            Cat.prototype.makeNoise = function () {
+                return "Meow! My name is: " + this.name;
+            };
+            return Cat;
+        }(Animal_1.Animal));
+        exports.Cat = Cat;
+
+        },{"./Animal":1}],3:[function(require,module,exports){
+        "use strict";
+        var __extends = (this && this.__extends) || (function () {
+            var extendStatics = Object.setPrototypeOf ||
+                ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+                function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+            return function (d, b) {
+                extendStatics(d, b);
+                function __() { this.constructor = d; }
+                d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+            };
+        })();
+        exports.__esModule = true;
+        var Animal_1 = require("./Animal");
+        var Dog = /** @class */ (function (_super) {
+            __extends(Dog, _super);
+            function Dog(name, dob) {
+                return _super.call(this, name, dob) || this;
+            }
+            Dog.prototype.makeNoise = function () {
+                return "Woof! I'm: " + this.name + "! I love you!";
+            };
+            return Dog;
+        }(Animal_1.Animal));
+        exports.Dog = Dog;
+
+        },{"./Animal":1}]},{},[]);
+
         ```
-    - We import these into the gulpfile:
-        ```js
-        var SOURCE_DIR = 'src';
-        var BUILD_DIR = 'build';
-        var SOURCE_MAPS_DIR = 'sourcemaps';
 
-        require('./gulp/ts-browserify-animal-module')(
-            SOURCE_DIR, 
-            BUILD_DIR,
-            SOURCE_MAPS_DIR
-        );
-
-        require('./gulp/ts-browserify-main2')(
-            SOURCE_DIR, 
-            BUILD_DIR,
-            SOURCE_MAPS_DIR
-        );
-        ```
-    - Let's take a look at the output bundles:
-
-        1. `build/main2.js`:
+    The first line of each bundle is just boilerplate to set up the Browserify require structure. A good introduction to the structure is [this post on how Browserify works](https://benclinkinbeard.com/posts/how-browserify-works/). 
+    
+    1. However, looking at the two bundles, you can see that in `main2.js`, there is no code from the Animal package. Instead, at the end, there is a statement `{"./AnimalLib":undefined}`. This basically tells the Browserify structure that there is an external requirement on a library which is exposed by the global string `"./AnimalLib"`. A global `require=` is defined, which is an instantly instantiating function that returns the function `function e(t,n,r){...}`, inside of which is more boilerplate. To this function's three paramters, we pass:
+        - For `t`, a hashtable of all the transpiled code in `main2.ts`:
             ```js
-            (function(){function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s}return e})()({1:[function(require,module,exports){
+            {1:[function(require,module,exports){
 
             "use strict";
             exports.__esModule = true;
@@ -1024,132 +1109,32 @@ Unfortunately, this was as far as I got with Browserify. I spent a multiple days
             var d = new AnimalLib_1.Dog("Coco", new Date());
             console.log(d.makeNoise());
 
-            },{"./AnimalLib":undefined}]},{},[1]);
+            },{"./AnimalLib":undefined}]}
             ```
-        2. `build/AnimalLib.js`
-            ```js
-            require=(function(){function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s}return e})()({"./AnimalLib":[function(require,module,exports){
+        - For `n`, an empty object `{}`
+        - For `r`, the reference to the code on `main2.ts`, indexed in the hashtable: `[1]`.
 
-            "use strict";
-            exports.__esModule = true;
-            /* AnimalLib/index.ts */
-            var Animal_1 = require("./Animal");
-            exports.Animal = Animal_1.Animal;
-            var Cat_1 = require("./Cat");
-            exports.Cat = Cat_1.Cat;
-            var Dog_1 = require("./Dog");
-            exports.Dog = Dog_1.Dog;
+    2. Now, in the AnimalLib bundle, the boilerplate line sets up a similar require (that's okay) and passed the first argument as  `{"./AnimalLib":{...}}`, the second as `{}` and the third as `[]`. All the code for AnimalLib (including the Animal, Cat and Dog classes) is in the `...`. Inside this, each of the classes in the package require one another in a way that is not visible outside (but the same structure is used).
+        Essentially, what happens is that the `AnimalLib.js` bundle exposes its contents via the global string `"./AnimalLib"`.
 
-            },{"./Animal":1,"./Cat":2,"./Dog":3}],1:[function(require,module,exports){
-            "use strict";
-            exports.__esModule = true;
-            var Animal = /** @class */ (function () {
-                function Animal(name, dob) {
-                    this.name = name;
-                    this.dob = dob;
-                }
-                return Animal;
-            }());
-            exports.Animal = Animal;
+    3. Let's include these two in `index2.html`:
+        ```html
+        <!-- src/index2.html -->
+        <!DOCTYPE html>
+        <html>
+            <head>
+                <meta charset="UTF-8" />
+                <title>Hello TypeScript!</title>
+            </head>
+            <body>
+                <script src="../build/AnimalLib.js"></script>
+                <script src="../build/main2.js"></script>
+            </body>
+        </html>
+        ```
 
-            },{}],2:[function(require,module,exports){
-            "use strict";
-            var __extends = (this && this.__extends) || (function () {
-                var extendStatics = Object.setPrototypeOf ||
-                    ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-                    function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
-                return function (d, b) {
-                    extendStatics(d, b);
-                    function __() { this.constructor = d; }
-                    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-                };
-            })();
-            exports.__esModule = true;
-            var Animal_1 = require("./Animal");
-            var Cat = /** @class */ (function (_super) {
-                __extends(Cat, _super);
-                function Cat(name, dob) {
-                    return _super.call(this, name, dob) || this;
-                }
-                Cat.prototype.makeNoise = function () {
-                    return "Meow! My name is: " + this.name;
-                };
-                return Cat;
-            }(Animal_1.Animal));
-            exports.Cat = Cat;
-
-            },{"./Animal":1}],3:[function(require,module,exports){
-            "use strict";
-            var __extends = (this && this.__extends) || (function () {
-                var extendStatics = Object.setPrototypeOf ||
-                    ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-                    function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
-                return function (d, b) {
-                    extendStatics(d, b);
-                    function __() { this.constructor = d; }
-                    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-                };
-            })();
-            exports.__esModule = true;
-            var Animal_1 = require("./Animal");
-            var Dog = /** @class */ (function (_super) {
-                __extends(Dog, _super);
-                function Dog(name, dob) {
-                    return _super.call(this, name, dob) || this;
-                }
-                Dog.prototype.makeNoise = function () {
-                    return "Woof! I'm: " + this.name + "! I love you!";
-                };
-                return Dog;
-            }(Animal_1.Animal));
-            exports.Dog = Dog;
-
-            },{"./Animal":1}]},{},[]);
-
-            ```
-
-        The first line of each bundle is just boilerplate to set up the Browserify require structure. A good introduction to the structure is [this post on how Browserify works](https://benclinkinbeard.com/posts/how-browserify-works/). 
-        
-        1. However, looking at the two bundles, you can see that in `main2.js`, there is no code from the Animal package. Instead, at the end, there is a statement `{"./AnimalLib":undefined}`. This basically tells the Browserify structure that there is an external requirement on a library which is exposed by the global string `"./AnimalLib"`. A global `require=` is defined, which is an instantly instantiating function that returns the function `function e(t,n,r){...}`, inside of which is more boilerplate. To this function's three paramters, we pass:
-            - For `t`, a hashtable of all the transpiled code in `main2.ts`:
-                ```js
-                {1:[function(require,module,exports){
-
-                "use strict";
-                exports.__esModule = true;
-                /* main2.ts */
-                var AnimalLib_1 = require("./AnimalLib");
-                var c = new AnimalLib_1.Cat("Mittens", new Date());
-                console.log(c.makeNoise());
-                var d = new AnimalLib_1.Dog("Coco", new Date());
-                console.log(d.makeNoise());
-
-                },{"./AnimalLib":undefined}]}
-                ```
-            - For `n`, an empty object `{}`
-            - For `r`, the reference to the code on `main2.ts`, indexed in the hashtable: `[1]`.
-
-        2. Now, in the AnimalLib bundle, the boilerplate line sets up a similar require (that's okay) and passed the first argument as  `{"./AnimalLib":{...}}`, the second as `{}` and the third as `[]`. All the code for AnimalLib (including the Animal, Cat and Dog classes) is in the `...`. Inside this, each of the classes in the package require one another in a way that is not visible outside (but the same structure is used).
-            Essentially, what happens is that the `AnimalLib.js` bundle exposes its contents via the global string `"./AnimalLib"`.
-
-        3. Let's include these two in `index2.html`:
-            ```html
-            <!-- src/index2.html -->
-            <!DOCTYPE html>
-            <html>
-                <head>
-                    <meta charset="UTF-8" />
-                    <title>Hello TypeScript!</title>
-                </head>
-                <body>
-                    <script src="../build/AnimalLib.js"></script>
-                    <script src="../build/main2.js"></script>
-                </body>
-            </html>
-            ```
-
-            The result is as we expect: 
-            ![TypeScript with Animal module working as expected despite being in a different bundle from the code importing it](img/TypeScript-Browserify-main2-and-Animal-bundles.jpg)
+        The result is as we expect: 
+        ![TypeScript with Animal module working as expected despite being in a different bundle from the code importing it](img/TypeScript-Browserify-main2-and-Animal-bundles.jpg)
         
         Seems great so far, right? However, there is a significant issue: `main2.ts`, on compilation using the gulp task, _always_ imports `"./AnimalLib"`. This string is autogenerated by the TypeScript compiler; there is no way to set up _any_ other string. As a result, the AnimalLib task _must_ expose `"./AnimalLib"`. 
 
@@ -1199,9 +1184,9 @@ To enable code-splitting in the fashion specified above, we are forced to ditch 
 
 1. Webpack can perform the vast majority of the tasks you’d otherwise do through a task runner. For instance, Webpack already provides options for minification and sourcemaps for your bundle. By using loaders, you can also add ES6 to ES5 transpilation, and CSS pre- and post-processors. That really just leaves unit tests and linting as major tasks that Webpack can’t handle independently. ([Source](https://www.toptal.com/front-end/webpack-browserify-gulp-which-is-better))
 
-1. Solid documentation.
+1. Solid documentation for Webpack 3 (as of March 2018, the Webpack 4 documentation has not surfaced yet).
 
-1. As per their  Suited for big projects
+1. Suited for big projects.
 
 [This post](https://scotch.io/tutorials/getting-started-with-webpack-module-bundling-magic) is a good introduction to Webpack and how to set it up.
 
@@ -1328,9 +1313,7 @@ The [Webpack concepts doc](https://webpack.js.org/concepts/) is pretty clear on 
             ...
         };
         ```
-        Here, we tell Webpack to make separate dependency graphs for each entry point. However, we can configure plugins such that one dependency graph is modified with respect to the others. See the [scenarios](https://webpack.js.org/concepts/entry-points/#scenarios) part of the docs:
-            - If we do an `app.js` and `vendor.js` split of entry points, we can use the `CommonsChunkPlugin` to replace all `require()`s in `app.js` that refer to vendor libraries, with calls to `__webpack_require__()`. Thus, the vendor code (i.e. dependencies like jQuery, etc) does not get built into the app bundle, so that the webpage can import them both in separate `<script>` tags. Thus, the vendor code can be cached by the browser, as it seldom changes. Only the `app.js` bundle is reloaded.
-            - If we create an entry point for each page in our multi-page app, `CommonsChunkPlugin` can create a bundle of the JS application code that is shared between pages. Multi-page applications that reuse a lot of code/modules between entry points can greatly benefit from these techniques, as the amount of entry points increase.
+        Here, we tell Webpack to make separate dependency graphs for each entry point. However, we can configure plugins such that one dependency graph is modified with respect to the others. See the [scenarios](https://webpack.js.org/concepts/entry-points/#scenarios) part of the docs.
         
         Note that as a rule of thumb in Webpack, each page should have its own _entry point_ (not necessarily one `<script>` import). We adhere to this principle in our code structure: `main.ts` is an entry point for `index.html`, and `main2.ts` for `index2.html`. These entry point files do have some business logic, but it is possible that they will dumbly import some of our library bundles (AnimalLib, ProductLib, CompanyLib) which in turn register JavaScript event handlers so that the user can interact with the page.
 

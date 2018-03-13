@@ -12,6 +12,10 @@ export class Organization{
         this.employees.add(e);
     }
 
+    public removeEmployee(e: Person){
+        this.employees.remove(e);
+    }
+
     toString(): string{
         return this.name;
     }

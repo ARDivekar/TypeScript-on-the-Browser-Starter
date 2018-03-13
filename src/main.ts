@@ -1,7 +1,14 @@
 /* main.ts */
 import * as $ from "jquery";
-import { Person, Organization, TechCompany } from "./CompanyLib"
-import { Order, TShirt, TShirtSizes, Catalog, Price, Currency, MobilePhone, PhoneNumber } from "./ProductLib";
+import { Person } from "./CompanyLib/Person"
+import { Organization } from "./CompanyLib/Organization";
+import { TechCompany } from "./CompanyLib/TechCompany";
+import { Order } from "./ProductLib/Order";
+import { TShirt } from "./ProductLib/TShirt";
+import { TShirtSizes } from "./ProductLib/TShirtSizes";
+import { Catalog } from "./ProductLib/Catalog";
+import { Price } from "./ProductLib/Price";
+import { Currency } from "./ProductLib/Currency";
 
 let amazon = new TechCompany("Amazon", "amazon.com");
 

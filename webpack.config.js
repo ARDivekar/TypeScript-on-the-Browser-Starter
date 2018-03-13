@@ -59,7 +59,7 @@ module.exports = function(env, argv){
             extensions: ['.ts', '.js', 'json']
         },
         output: {
-            filename: '[name].bundle.js',
+            filename: '[name]-[chunkhash:6].bundle.js',
             path: path.resolve(__dirname, 'build')
         }
     };

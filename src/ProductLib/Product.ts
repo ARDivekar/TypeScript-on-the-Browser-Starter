@@ -1,6 +1,6 @@
 import { Price } from "./Price";
 import { Currency } from "./Currency";
-import { Organization } from "../CompanyLib";
+import { Organization } from "../CompanyLib/Organization";
 
 
 export abstract class Product{

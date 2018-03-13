@@ -1,7 +1,7 @@
 import { Price } from "./Price";
 import { Currency } from "./Currency";
 import { Product } from "./Product";
-import { Organization } from "../CompanyLib";
+import { Organization } from "../CompanyLib/Organization";
 import { PhoneNumber } from "./PhoneNumber";
 
 export class MobilePhone extends Product {
