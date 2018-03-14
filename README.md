@@ -813,6 +813,8 @@ By setting up our project like this, we make a few important assumptions about h
 
     However, you should always minify and cache large vendor libraries. "Large" is subjective: the Webpack size warning is triggered at 30 KB. Look for data on your users' hardware specifications (network speed, device CPU, RAM) to see what is acceptable.
 
+    This example project does not really have a lot of code, but that's because it's, well, an example. In real life you will probably write a lot more code.
+
 
 - **Different pages in our web app will require a single entry file but different application and vendor library bundles.** 
 
@@ -2369,7 +2371,7 @@ Now, we have separate bundles which we can import separately from different HTML
 ```
 One awesome thing here is that the order of the imports _does not matter_! You can swap them around and try for yourself.
 
-If you remove one of the imports, all code bundles depending on it will silently fail, to be careful.
+If you remove one of the imports, all code bundles depending on it will silently fail, so be careful.
 
 Note: in the config, we had specified the chunkhash in the output bundle name. This is for demonstation purposes only: if I make a small change in CompanyLib/Organization.ts (which is depended on by multiple other files) and then re-compile, I get:
 
@@ -2395,3 +2397,262 @@ Entrypoint main2 = AnimalLib-b9d09f.bundle.js main2-abc3b7.bundle.js
 ```
 
 If you notice carefully, _only the hash of the CompanyLib bundle has changed_. The others are unaffected! This means that users can cache those bundles if `Organization.ts` changes between two user sessions, even though those bundles depdend on `Organization.ts`.
+
+In an actual production environment, you won't specify the chunk hashes as part of the file name since you will have to constantly keep updating your imports. Instead, use:
+```js
+output: {
+    filename: '[name].bundle.js',
+    path: path.resolve(__dirname, 'build')
+}
+```
+
+
+#### Nested application libraries:
+Let's assume that inside `AnimalLib`, you want to segregate animals as to whether they are mammals, reptiles or birds. However, they all still take from the same main class, `Animal.ts`
+
+Let's do this and add a few more classes:
+```
+src
+|
+|-- AnimalLib  // a library folder
+|   |-- Animal.ts
+|   |-- Mammals
+|   |   |-- Cat.ts
+|   |   |-- Dog.ts
+|   |-- Reptiles
+|   |   |-- Snake.ts
+|   |-- Birds
+|   |   |-- Hawk.ts
+```
+Now, if we re-build using the existing Webpack config:
+```
+Hash: 15d446f4e7e784077ca8
+Version: webpack 4.1.0
+Time: 3110ms
+Built at: 2018-3-14 10:10:29
+Environment (--env): "prod"
+                                  Asset      Size  Chunks             Chunk Names
+                jquery-6c5dbc.bundle.js  84.5 KiB       0  [emitted]  jquery
+            CompanyLib-d97a47.bundle.js  1.65 KiB       1  [emitted]  CompanyLib
+             AnimalLib-2962bb.bundle.js  1.32 KiB       2  [emitted]  AnimalLib
+            ProductLib-e46420.bundle.js  4.17 KiB       3  [emitted]  ProductLib
+typescript_collections-ee138a.bundle.js  27.8 KiB       4  [emitted]  typescript_collections
+                 main2-672533.bundle.js  1.27 KiB       5  [emitted]  main2
+                  main-e5d5f4.bundle.js   2.1 KiB       6  [emitted]  main
+Entrypoint main = typescript_collections-ee138a.bundle.js ProductLib-e46420.bundle.js CompanyLib-d97a47.bundle.js jquery-6c5dbc.bundle.js main-e5d5f4.bundle.js
+Entrypoint main2 = AnimalLib-2962bb.bundle.js main2-672533.bundle.js
+```
+If you notice the hash of `main2.ts` has changed; as it depends on AnimalLib, we had the import strings to reflect the new folder structure:
+```ts
+/* main2.ts */
+import { Cat } from "./AnimalLib/Mammals/Cat"; // changed
+import { Dog } from "./AnimalLib/Mammals/Dog"; // changed
+
+let c: Cat = new Cat("Mittens", new Date());
+console.log(c.makeNoise());
+
+let d = new Dog("Coco", new Date())
+console.log(d.makeNoise());
+```
+`AnimalLib`'s hash has changed for the same reason; `Cat.ts` and `Dog.ts` have changed as they must now import `AnimalLib.ts` via a different import string.
+
+If you go through the generated bundles, you will notice that the contents of `AnimalLib/Reptiles` and `AnimalLib/Birds` is not present; this is because we had set the entry point of our dependency graph as `main.ts` and `main2.ts`, both of which do not need them.
+However, suppose we create `main3.ts`, which does use these:
+```ts
+/* main3.ts */
+import { Snake } from "./AnimalLib/Reptiles/Snake";
+import { Hawk } from "./AnimalLib/Birds/Hawk";
+
+let randal: Snake = new Snake("Randal", new Date());
+randal.makeNoise();
+randal.slither();
+
+let clint: Hawk = new Hawk("Clink", new Date());
+clint.attack(randal);
+```
+
+We add this to our list of entry points:
+```js
+entry: {
+    main: "./src/main.ts",
+    main2: "./src/main2.ts",
+    main3: "./src/main3.ts",
+},
+```
+If we now compile, we get the following output:
+```
+Hash: f252e723a97b494edf97
+Version: webpack 4.1.0
+Time: 5508ms
+Built at: 2018-3-14 10:57:14
+Environment (--env): "prod"
+                                  Asset      Size  Chunks             Chunk Names
+             AnimalLib-30d2fb.bundle.js  2.69 KiB       0  [emitted]  AnimalLib
+                jquery-31591b.bundle.js  84.5 KiB       1  [emitted]  jquery
+            CompanyLib-8fcab9.bundle.js  1.65 KiB       2  [emitted]  CompanyLib
+            ProductLib-69bbaf.bundle.js  4.17 KiB       3  [emitted]  ProductLib
+typescript_collections-aa0527.bundle.js  27.8 KiB       4  [emitted]  typescript_collections
+                 main3-cd0801.bundle.js  1.25 KiB       5  [emitted]  main3
+                 main2-3b2cbc.bundle.js  1.27 KiB       6  [emitted]  main2
+                  main-39cac5.bundle.js   2.1 KiB       7  [emitted]  main
+Entrypoint main = typescript_collections-aa0527.bundle.js ProductLib-69bbaf.bundle.js CompanyLib-8fcab9.bundle.js jquery-31591b.bundle.js main-39cac5.bundle.js
+Entrypoint main2 = AnimalLib-30d2fb.bundle.js main2-3b2cbc.bundle.js
+Entrypoint main3 = AnimalLib-30d2fb.bundle.js main3-cd0801.bundle.js
+```
+You will notice, `AnimalLib.bundle.js` has almost doubled in size. This is because it also contains code from `Reptiles/` and `Birds/`. This is bad, because `main2.ts` only needs `Animal.ts` and the contents of `Mammals/`, whereas `main3.ts` needs `Animal.ts` and the contents of `Reptiles/` and `Birds/`. 
+
+We can optimize these nested application libraris by separating them into their own bundles:
+- `AnimalLib.bundle.js` contains the `Animal.ts` file
+- `AnimalLib-Mammals.bundle.js` contains all files under `AnimalLib/Mammals`.
+- `AnimalLib-Reptiles.bundle.js` contains all files under `AnimalLib/Reptiles`.
+- `AnimalLib-Birds.bundle.js` contains all files under `AnimalLib/Birds`.
+
+To achieve this, we have the following Webpak config:
+```js
+const config = {
+    entry: {
+        main: "./src/main.ts",
+        main2: "./src/main2.ts",
+        main3: "./src/main3.ts",
+    },
+    optimization:{
+        splitChunks: {
+            cacheGroups: {
+                AnimalLib: {
+                    test: new RegExp('AnimalLib' + '\\' + path.sep + '([^' + '\\' + path.sep + ']+.ts)'),
+                    chunks: "initial",
+                    name: "AnimalLib",
+                    enforce: true,
+                },
+                Mammals: {
+                    test: new RegExp('AnimalLib' + '\\' + path.sep + 'Mammals' + '\\' + path.sep +   '.*.ts'),
+                    chunks: "initial",
+                    name: "AnimalLib-Mammals",
+                    enforce: true,
+                },
+                Reptiles: {
+                    test: new RegExp('AnimalLib' + '\\' + path.sep + 'Reptiles' + '\\' + path.sep +   '.*.ts'),
+                    chunks: "initial",
+                    name: "AnimalLib-Reptiles",
+                    enforce: true,
+                },
+                Birds: {
+                    test: new RegExp('AnimalLib' + '\\' + path.sep  + 'Birds' + '\\' + path.sep +  '.*.ts'),
+                    chunks: "initial",
+                    name: "AnimalLib-Birds",
+                    enforce: true,
+                },
+                CompanyLib: {
+                    test: new RegExp('CompanyLib' + '\\' + path.sep + '.*.ts'),
+                    chunks: "initial",
+                    name: "CompanyLib",
+                    enforce: true
+                },
+                ProductLib: {
+                    test: new RegExp('ProductLib' + '\\' + path.sep + '.*.ts'),
+                    chunks: "initial",
+                    name: "ProductLib",
+                    enforce: true
+                },
+                jquery: {
+                    test: new RegExp('node_modules' + '\\' + path.sep + 'jquery.*'),
+                    chunks: "initial",
+                    name: "jquery",
+                    enforce: true
+                },
+                typescript_collections: {
+                    test: new RegExp('node_modules' + '\\' + path.sep + 'typescript-collections.*'),
+                    chunks: "initial",
+                    name: "typescript_collections",
+                    enforce: true
+                }
+            }
+        }
+    },
+    module: {
+        rules: [
+            {
+                resource: {
+                    test: /\.ts$/,
+                    exclude: /node_modules/,
+                },
+                use: 'awesome-typescript-loader',
+            }
+        ]
+    },
+    resolve: {
+        extensions: ['.ts', '.js', 'json']
+    },
+    output: {
+        filename: '[name]-[chunkhash:6].bundle.js',
+        path: path.resolve(__dirname, 'build')
+    }
+};
+```
+Note: there is a tricky bit of regex to create `AnimalLib.bundle.js`: 
+```js
+new RegExp('AnimalLib' + '\\' + path.sep + '([^' + '\\' + path.sep + ']+.ts)')
+```
+This is an OS-independent way to match all `.ts` files under `AnimalLib/`, but _not_ in any of its subdirectories `Mammals/`, `Reptiles/` or `Birds/`. Basically, what we do is exclude the path separator after we are inside the `AnimalLib/` folder. On Windows, this regex becomes `/AnimalLib\\([^\\]+.ts)/` and on Unix systems, it becomes `/AnimalLib\/([^\/]+.ts)/`. See more information [here](https://stackoverflow.com/a/49271995/4900327).
+
+The output of `$ webpack --env prod` is as follows:
+```
+[at-loader] Ok, 0.258 sec.
+Hash: 4439a412c3e1cfb562d6
+Version: webpack 4.1.0
+Time: 2135ms
+Built at: 2018-3-15 01:36:34
+Environment (--env): "prod"
+                                  Asset       Size  Chunks             Chunk Names
+            CompanyLib-af0547.bundle.js   1.65 KiB       5  [emitted]  CompanyLib
+             AnimalLib-24416e.bundle.js  269 bytes       0  [emitted]  AnimalLib
+    AnimalLib-Reptiles-0b65bb.bundle.js  733 bytes       2  [emitted]  AnimalLib-Reptiles
+       AnimalLib-Birds-77e736.bundle.js  743 bytes       3  [emitted]  AnimalLib-Birds
+     AnimalLib-Mammals-416ef6.bundle.js   1.16 KiB       4  [emitted]  AnimalLib-Mammals
+                jquery-31591b.bundle.js   84.5 KiB       1  [emitted]  jquery
+            ProductLib-a0ec5b.bundle.js   4.17 KiB       6  [emitted]  ProductLib
+typescript_collections-bc8a7c.bundle.js   27.8 KiB       7  [emitted]  typescript_collections
+                 main3-16b05f.bundle.js   1.25 KiB       8  [emitted]  main3
+                 main2-5bf4e3.bundle.js   1.27 KiB       9  [emitted]  main2
+                  main-746651.bundle.js    2.1 KiB      10  [emitted]  main
+Entrypoint main = typescript_collections-bc8a7c.bundle.js ProductLib-a0ec5b.bundle.js CompanyLib-af0547.bundle.js jquery-31591b.bundle.js main-746651.bundle.js
+Entrypoint main2 = AnimalLib-24416e.bundle.js AnimalLib-Mammals-416ef6.bundle.js main2-5bf4e3.bundle.js
+Entrypoint main3 = AnimalLib-24416e.bundle.js AnimalLib-Birds-77e736.bundle.js AnimalLib-Reptiles-0b65bb.bundle.js main3-16b05f.bundle.js
+```
+If we look into the bundles, we can see that they contain only the code of their respective application libraries. The code of the nested application libraries are in their own bundle.
+
+We can now import these bundles in our HTML:
+```html
+<!-- src/index2.html -->
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8" />
+        <title>Hello TypeScript!</title>
+    </head>
+    <body>
+        <script src="../build/main2.bundle.js"></script>
+        <script src="../build/AnimalLib.bundle.js"></script>
+        <script src="../build/AnimalLib-Mammals.bundle.js"></script>
+    </body>
+</html>
+```
+```html
+<!-- src/index3.html -->
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Hello TypeScript!</title>
+</head>
+
+<body>
+    <script src="../build/main3.bundle.js"></script>
+    <script src="../build/AnimalLib.bundle.js"></script>
+    <script src="../build/AnimalLib-Birds.bundle.js"></script>
+    <script src="../build/AnimalLib-Reptiles.bundle.js"></script>
+</body>
+
+</html>
+```

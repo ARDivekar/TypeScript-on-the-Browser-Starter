@@ -6,16 +6,34 @@ module.exports = function(env, argv){
         entry: {
             main: "./src/main.ts",
             main2: "./src/main2.ts",
+            main3: "./src/main3.ts",
         },
         optimization:{
             splitChunks: {
                 cacheGroups: {
                     AnimalLib: {
-                        test: new RegExp('AnimalLib' + '\\' + path.sep + '.*.ts'),
+                        test: new RegExp('AnimalLib' + '\\' + path.sep + '([^' + '\\' + path.sep + ']+.ts)'),
                         chunks: "initial",
                         name: "AnimalLib",
                         enforce: true,
-                        
+                    },
+                    Mammals: {
+                        test: new RegExp('AnimalLib' + '\\' + path.sep + 'Mammals' + '\\' + path.sep +   '.*.ts'),
+                        chunks: "initial",
+                        name: "AnimalLib-Mammals",
+                        enforce: true,
+                    },
+                    Reptiles: {
+                        test: new RegExp('AnimalLib' + '\\' + path.sep + 'Reptiles' + '\\' + path.sep +   '.*.ts'),
+                        chunks: "initial",
+                        name: "AnimalLib-Reptiles",
+                        enforce: true,
+                    },
+                    Birds: {
+                        test: new RegExp('AnimalLib' + '\\' + path.sep  + 'Birds' + '\\' + path.sep +  '.*.ts'),
+                        chunks: "initial",
+                        name: "AnimalLib-Birds",
+                        enforce: true,
                     },
                     CompanyLib: {
                         test: new RegExp('CompanyLib' + '\\' + path.sep + '.*.ts'),
@@ -59,7 +77,7 @@ module.exports = function(env, argv){
             extensions: ['.ts', '.js', 'json']
         },
         output: {
-            filename: '[name]-[chunkhash:6].bundle.js',
+            filename: '[name].bundle.js',
             path: path.resolve(__dirname, 'build')
         }
     };
@@ -100,7 +118,7 @@ module.exports = function(env, argv){
         entrypoints: true,
 
         /* Module-specific stats: */
-        modules: true,
+        modules: false,
         maxModules: 1000,
         depth: true,
         modulesSort: "depth",

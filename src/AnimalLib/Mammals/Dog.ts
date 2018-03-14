@@ -1,4 +1,4 @@
-import { Animal } from "./Animal";
+import { Animal } from "../Animal";
 export class Dog extends Animal {
     public constructor(name: string, dob: Date) {
         super(name, dob);
