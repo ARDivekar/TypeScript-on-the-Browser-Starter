@@ -673,60 +673,73 @@ The filesize increase in minimal (from 120kB to 126 kB...a little more than 4.4%
 
 ## Modular TypeScript
 
-### The need for Code Splitting on the frontend:
+### The need for Bundle Splitting on the frontend:
 
 If your web application is just one page, then maybe it's okay to minify all your source code into a single file and send to your clients, like we did above with `allFiles-min.js`. 
+
 - However, if you have multiple pages in your web app, then most likely they will require different sets of JavaScript code. 
 
-    For example, if your app has `Page1.html` which requires:
-    - `ModueA/`, `ModuleB/` and `ModuleC/` 
-    
-    And `Page2.html` requires: 
-    - `ModuleA/` and `ModuleD/`
+    For example, if your web app has: 
+    - `Page1.html` which requires files from `AppLibA/`, `AppLibB/` and `AppLibC/`.
+    - `Page2.html` which requires `AppLibA/` and `AppLibD/`.
     
     ...then it makes sense to split the each module into a separate JavaScript file, which can be imported as required:
 
     ```html
     <!-- Page1.html -->
-    <script src="build/ModuleA-min.js" ></script>
-    <script src="build/ModuleB-min.js" ></script>
-    <script src="build/ModuleC-min.js" ></script>
+    <script src="build/AppLibA-min.bundle.js" ></script>
+    <script src="build/AppLibB-min.bundle.js" ></script>
+    <script src="build/AppLibC-min.bundle.js" ></script>
     ```
 
     ```html
     <!-- Page2.html -->
-    <script src="build/ModuleA-min.js" ></script>
-    <script src="build/ModuleD-min.js" ></script>
+    <script src="build/AppLibA-min.bundle.js" ></script>
+    <script src="build/AppLibD-min.bundle.js" ></script>
     ```
-    If you keep all the code bundled up in one file, then your client ends up paying the price, as they have to load extra code on for both `Page1.html` and `Page2.html`.
+    If you keep all the code in one bundle file, then your users end up paying the price, as they have to load extra code on for both `Page1.html` and `Page2.html`.
 
-- Even if your app has only one page (say, `Page1.html` from the above point), then it still makes sense to modularize your JS imports:
+    > Note that `AppLib` stands for <a name="application-library">_application library_</a>. Meaning, it is a modular, specialized section of your web app code that is consumed by other parts of your application. You and your team write all application libraries for your web app. 
+    >
+    > This is opposed to <a name="vendor-library">_vendor libraries_</a>, which are written by third parties.
+    >
+    > E.g. In our sample TypeScript codebase, `ProductLib` and `CompanyLib` are application libraries. They contain multiple `*.ts` files under them, but they each provide one kind of business logic (for Products and Companies, respectively). They are consumed by `main.ts`, which can be considered <a name="wiring-code">_wiring code_</a>. `jquery` and `typescript-collections` would be the vendor libraries.
+    >
+    > These are not a hard-and-fast naming conventions; I just use such terms to be clear about what I am referring to during the discussion.
+
+
+- Even if it is a single-page app (say, `Page1.html` from the above point), then it still makes sense to modularize your JS imports:
     
-    Throughout the life of your web application, you will probably make many changes to JavaScript modules, adding new features, fixing new bugs, and so on. Depending on your deployment policy, you will periodically push such changes to your Production environment, where they will be visible to users.
+    Throughout the life of your web application, you will probably make many changes to your application libraries: adding new features, fixing new bugs, and so on. Depending on your deployment policy, you will periodically push such changes to your Production environment, where they will be visible to users. 
     
-    However, there is no neccessity that _all_ your JavaScript modules must change between deployment cycles. By allowing your codebase's modules to become JS imports on the client side, you can leaverage [_browser caching_](https://developers.google.com/web/fundamentals/performance/optimizing-content-efficiency/http-caching) to avoid re-sending code files which have not changed.
+    However, there is no neccessity that _all_ your JavaScript modules must change between deployment cycles. If you structure your codebase into application libraries and configure your build system so that each application library becomes a single JS bundle that is imported on the client side, you can leaverage [_browser caching_](https://developers.google.com/web/fundamentals/performance/optimizing-content-efficiency/http-caching) to avoid re-sending code files which have not changed.
     
-    E.g. suppose your team has a two-week deployment cycle,starting on 3rd March. The next deployment is scheduled on 17th March. In those two weeks, you've been working on `Page1.html` (the only page in your web app), and have made changes to `ModuleA` and `ModuleC`. `ModuleB` was untouched. 
+    Example:
+
+    - Suppose your team has a two-week deployment cycle. The cycle starts with a Production deployment of the latest changes on 3rd March. The next deployment is scheduled on 17th March. 
     
-    When the two weeks are up, you must upload these changes to your Production server so that users can see the updates. There are two ways to do this:
+        In those two weeks, you've been working on `Page1.html` (the only page in your web app), and have made changes to `AppLibA` and `AppLibC`. `AppLibB` was untouched. 
     
-    1. Combine all the code into one bundle, `allFiles-min.js`, and upload it. In this scenario, the hash of the file will have changed, and the user's browser will be unable to cache the file. 
-    1. Keep each module as a separate file, `ModuleA-min.js`, `ModuleB-min.js` and `ModuleC-min.js`, and import each of these from the client HTML. Lets assume these are the filesizes:
-        ```
-        ModuleA-min.js : 100 kB
-        ModuleB-min.js : 50 kB
-        ModuleB-min.js : 30 kB
-        ```
-    By relying on the browser's ability to cache files, you have shaved 27% off your JS payload size! This number will of course vary depending on which module(s) have been modified during the last deployment cycle: the number can vary from 0% to 100%. You should think about modularizing your JavaScript codebase in a way that each module will be changed independent of others, thus minimizing the number of modules.
+    - When the two weeks are up, you must upload these changes to your Production server so that users can see the updates. There are two ways to do this:
+        1. Keep each module as a separate file, `AppLibA-min.bundle.js`, `AppLibB-min.bundle.js` and `AppLibC-min.bundle.js`, and import each of these from the client HTML. Lets assume these are the filesizes:
+            ```js
+            AppLibA-min.bundle.js : 100 kB
+            AppLibB-min.bundle.js : 50 kB
+            AppLibC-min.bundle.js : 30 kB
+            ```
+        1. Combine all the code into one bundle, `allFiles-min.js`, and upload it. The file size will be `180 kB`.
+            
+    - In method #2, the changes made in `AppLibA` and `AppLibC` cause the contents (and hence hash) of the file `allFiles-min.js` to change. The user's browser will be unable to cache the file. 
+    - However, in methos #1, we can cache `AppLibB-min.bundle.js`, which saves us from loading `50kB` of code. Thus by relying on the browser's ability to cache files, you have shaved 27% off your JS payload size! This number will of course vary depending on which module(s) have been modified during the last deployment cycle: the number can vary from 0% to 100%. You should think about modularizing your codebase in a way that each module will be changed independent of others, thus taking full advantage of client-side caching.
 
-    Note: it won't be _exactly_ 27%, since if you minify all the files together, you can technically achieve a better minification. But the difference will most likely be minimal - less than 1% - for which you give up any savings provided by browser caching. The difference reduces further if you keep the function names during minification, as shown earlier (you always have to do this when you use modularized JS imports).
+        Note: it won't be _exactly_ 27%, since if you minify all the files together, you can technically achieve a better minification. But the difference will most likely be minimal - less than 1% - for which you give up any savings provided by browser caching. The difference reduces further if you keep the function names during minification, as shown earlier (you always have to do this when you use modularized JS imports).
 
-    Note: the idea of making multiple JS imports out of a single import is called _Code Splitting_. It took me a really long time to figure this out :P
+    Note: the idea of making multiple JS imports out of a single import is called _Bundle Splitting_. It took me a really long time to figure this out.
 
 
-### Structure of a modular TypeScript codebase:
+### <a name="modular-typescript-structure">Structure of a modular TypeScript codebase</a>: 
 
-So now, let's get started with creating multiple JS files from each module. This is a bit tricky, so I will start with a simpler codebase with a single module, `src/AnimalLib/`, which is consumed by `src/main2.ts`. On transpilation, these become `build/AnimalLib.bundle.js` and `build/main2.bundle.js`, respectively. The HTML file `index2.html` will import them:
+So now, let's get started with creating an app strucuted into multiple application libraries. I add the application library, `src/AnimalLib/`, which is consumed by `src/main2.ts`. On transpilation, these become `build/AnimalLib.bundle.js` and `build/main2.bundle.js`, respectively. The HTML file `index2.html` will import them:
     
 ```html
 <!-- src/index2.html -->
@@ -754,7 +767,7 @@ src
 
 `Animal.ts` exports and abstract class `Animal`, which is consumed by concrete classes `Dog` and `Cat`.
 
-This is similar to the structure of `CompanyLib` and `ProductLib`.
+We structure the application libraries `CompanyLib` and `ProductLib` in a similar way:
 ```
 src
 |
@@ -777,7 +790,8 @@ src
 |
 ...
 ```
-These are consumed by `main.ts`, just as `AnimalLib` was consumed by `main2.ts`.
+These two are consumed by `main.ts`, just as `AnimalLib` was consumed by `main2.ts`.
+
 
 #### Dependency graph
 
@@ -793,7 +807,7 @@ For this to work, you have to first install [Graphviz](https://graphviz.gitlab.i
 
 #### Output JavaScript bundles:
 
-Our intention is to make each library directory a separate `*.js` bundle, and a separate bundle for each entry file. 
+Our intention is to make each library directory a separate `*.js` bundle, and a separate bundle for each entry file.
 
 So, our build system should generate the following bundles:
 1. `build/main.bundle.js` (entry file)
@@ -803,85 +817,10 @@ So, our build system should generate the following bundles:
 1. `build/ProductLib.bundle.js` (library bundle)
 
 
-#### Assumptions on application structure and usage patterns:
-
-By setting up our project like this, we make a few important assumptions about how our web application will be structured and used:
-
-- **There is a significant amount of code in the application libraries.**
-
-    If all the application library code put together is a small fraction of the size of the total code size, then it might be a waste of effort to over-optimize the caching of the application library bundles. Just put everything in one bundle, even if the client must reload it every time.
-
-    However, you should always minify and cache large vendor libraries. "Large" is subjective: the Webpack size warning is triggered at 30 KB. Look for data on your users' hardware specifications (network speed, device CPU, RAM) to see what is acceptable.
-
-    This example project does not really have a lot of code, but that's because it's, well, an example. In real life you will probably write a lot more code.
-
-
-- **Different pages in our web app will require a single entry file but different application and vendor library bundles.** 
-
-    E.g.
-    1. `src/index.html` will contain imports for `main.bundle.js`, `CompanyLib.bundle.js`, and `ProductLib.bundle.js`.
-    1. `src/index2.html` will contain imports for `main2.bundle.js`, and `AnimalLib.bundle.js`.
-
-    It is possible that other pages will require a different mix of bundles.
-
-- **Third party libraries will change fairly infrequently.**
-
-    This one is straightforward. If the third party libraries do not change frequently, they will only need to be loaded the first time the user visits the page. All subsequent times, the library will be cached. 
-    
-    In fact, if you use a CDN rather than serve it from your server, you get a double win: you don't decrease the load on your server, and there is a possibility that the user might have already cached the file on another website, saving you the trouble of loading it at all.
-
-
-- **The dependency graph of application libraries is relatively stable.**
-
-    Over time, as we add more features, a particular application library will use more and more features of another application/vendor library, but we expect the larger the dependency graph between application and vendor libraries will be fairly constant. So, by making each application library a separate bundle, the client can cache entire application libraries. 
-    
-    To allow this, we must ensure that a change in the code of a particular application library will not affect the output bundle of any of its dependents.
-
-- **Users will visit the page(s) frequently.**
-
-    For some kind of pages, the user will only visit a particular page very rarely. E.g. the payment page for a subscription-based website. The user will only visit this page once a year or so. It does not make sense to use this kind of project module structure for such a page; you might as well save yourself the hassle of creating a complex build system, and create a single bundle of all your code.
-
-    We assume that the median user will use the web app, then go away for some time, and the next time (s)he visits the app, _none_ or _some_ of the code will have changed. 
-    
-    The word _some_ here is important. We assume the project is being actively worked on, and _all_ the code will not have changed between user visits. Thus, user's browser can cache the modules which are unchanged between one visit and the next.
-
-    An ideal example of the kind of use-case we are targeting is an Amazon product page:
-    - Users often use Amazon in bursts: they will use it once for an hour, opening different products to compare, then after making a purchase (or not), they will not visit any product page for a week or two. 
-    - The JavaScript, CSS etc. for the Amazon product page can be cached the first time they open the page, and then these cached files can be reused for the rest of the session. 
-    - During the next session, if only a small percentage of the code has been modified (say, 0-30%) then on visiting the product page for the first time, only those pieces of code will need to be reloaded. For all subsequent page visits in this session, the files will be completely cached, just as they were in the previous session.
-
-
-These assumptions are all important for our project because _importing entire application libraries as bundles is not optimal in terms of size_. It is highly possible, even probable, that the bundles have some code which is unused by the page entry point.
-
-In our example TypeScript project, we include `src/ProductLib/MobilePhone.ts` and `src/ProductLib/PhoneNumber.ts` into `ProductLib.bundle.js`, even though they are never used by `main.ts`. If this happens for all application libraries, then the total size of the code sent to the client increases significantly.
-
-So, why do we do this, then? Because on each visit _the user only pays the cost of the modified bundles_. On average over multiple visits, the user will be paying a much smaller cost than if he loaded the entire bundle fresh each time.
-
-Let's take an example to explain this:
-
-1. Assume there are eight application libraries: `ALib`, `BLib`, ... , `HLib`. 
-    - Case 1: Each of the corresponding bundles (`ALib.bundle.js` to `GLib.bundle.js`) is 125 KB, for a total of 1 MB. The main entry file, `page.ts`, adds 1KB (negligible).
-    - Case 2: Assume we write all our imports such that only the specific file is required instead of the entire bundle (i.e. `import { Product } from "./ProductLib/Product"` instead of `import { Product } from "./ProductLib"`), then on bundling with `page.ts` as the entry point, the resulting bundle has size 700 KB (a 30% savings in the size over Case 1).
-1. Assume the user visits the page with a frequency such that and between visits (on average), 4 out of the 8 bundles have changed (i.e. 50% deltas). Note that each visit is a really a "session", i.e. we load only one page, and thus there is no caching until the next session.
-1. Let us now calculate the _total_ network bandwidth consumed in both cases, over 10 user sessions:
-    - In case 1 (8 separate bundles):
-        1. Session 1: we pay the full cost of 1 MB  i.e. 1000 KB.
-        2. Session 2-10: we pay `(average number of bundles changed)*(bundle size)*(number of visits)`, i.e. `4*125*9` = 4500 KB.
-        3. The total cost paid is 5500KB, for an amortized cost of 550KB per session.
-    - In case 2 (one single bundle):
-        1. Since 50% of the content of the bundle changes, we have to _reload the entire bundle every time_. This is where the amortized cost of having a single bundle goes up. Over 10 sessions, we load 10*700 = 7000 KB, or 700 KB per session.
-    
-    As we have more and more sessions, the amortized cost of having multiple bundles decreases until it is eventually close to its theoretical minimum, 4500 KB.
-
-Note that this calculation assumes that there we set the [HTTP cache control directive](https://developers.google.com/web/fundamentals/performance/optimizing-content-efficiency/http-caching) as `no-cache`, i.e. the client always checks with the server if the file has changed. This does incur an excess cost in each request. 
-
-If we instead use the `max-age` paramter, the client will wait for some time before asking the server if the file has changed. This value should be synced up with your Production deployment strategy: if you deploy code to Prod at 12pm on Wednesdays and Fridays, you should set the value of `max-age` as the number of seconds in two days (i.e. 172,800), since that is the maximum amount of time that you can be sure that the resource will not be stale. With such a policy, you can increase the performance for both single-bundle and multi-bundle builds.
 
 
 
-
-
-### My issues setting up code splitting with Browserify:
+### My issues setting up bundle splitting with Browserify:
 
 Unfortunately, this was as far as I got with Browserify. I spent a multiple days looking for a good solution, and in fact found a few decent articles/posts on how to achieve code splitting in Browserify:
 
@@ -2220,7 +2159,7 @@ module.exports = function(env, argv){
 
 ## Optimizing your Webpack bundles:
 
-This section (finally) talks about how to bundle your application libraries so that your users can cache it on their browsers.
+This section (finally) talks about how to bundle your application libraries so that your users can cache them on their browsers.
 
 We will also discuss other methods of improving the user experience via Webpack.
 
@@ -2231,10 +2170,11 @@ Before we start, we need to explain some Webpack concepts:
 1. Chunks can be split into more chunks (so long as there is at least one module in the chunk).
 1. After the dependency graph is parsed, chunks are combined/split, etc, the final set of chunks is written to disk, with each chunk as one bundle.
 
-### Caching application library bundles
+### Bundle-splitting on a modular TypeScript application:
 
-Webpack 3 had you messing with things like `CommonsChunkPlugin`.
-With Webpack 4, bundle-splitting becomes quite simple: we must use `config.optimization.splitChunks.cacheGroups`. This takes as input a JSON object, each key of which is a separate bundle that you want to create. The entry points are also created as separate bundles.
+In [a previous section](#modular-typescript-structure), we discussed how to set up a modular TypeScript codebase. This section describes how to get Webpack to create bundles out of each of our entry points, application libraries, and vendor libraries.
+
+Webpack 3 had you messing with things like `CommonsChunkPlugin`. With Webpack 4, bundle-splitting becomes quite simple: we must use `config.optimization.splitChunks.cacheGroups`. This takes as input a JSON object, each key of which is a separate bundle that you want to create. The entry points are also created as separate bundles.
 ```js
 const config = {
     entry: {
@@ -2407,7 +2347,7 @@ output: {
 ```
 
 
-#### Nested application libraries:
+#### Bundling nested application libraries:
 Let's assume that inside `AnimalLib`, you want to segregate animals as to whether they are mammals, reptiles or birds. However, they all still take from the same main class, `Animal.ts`
 
 Let's do this and add a few more classes:
@@ -2656,3 +2596,85 @@ We can now import these bundles in our HTML:
 
 </html>
 ```
+
+
+#### <a name="modular-typescript-assumptions">Assumptions about the modular TypeScript application</a>:
+
+By setting up our project like this, we make a few important assumptions about the codebase and traffic patterns of users of our web application:
+
+- **There is a significant amount of application library code.**
+
+    If all the application libraries put together are only a small fraction of the total code size (say, less than 5%) due to large vendor libraries, then it might be a waste of effort to over-optimize the caching of the application library bundles. Just put everything in one bundle, even if the client must reload it every time you push updates.
+
+    However, you should always minify and cache large vendor libraries. There is almost never a disadvantage here.
+    - "Large" is subjective: the Webpack size warning is triggered at 30 KB. Look for data on your users' hardware specifications (network speed, device CPU, RAM) to see what is acceptable.
+
+    This example project does not really have a lot of code, but that's because it's, well, an example. In real life you will probably write a lot more code and much more complexity.
+
+
+- **Different pages in our web app will require a single entry file but different application and vendor library bundles.** 
+
+    E.g.
+    1. `src/index.html` will contain imports for `main.bundle.js`, `CompanyLib.bundle.js`, and `ProductLib.bundle.js`.
+    1. `src/index2.html` will contain imports for `main2.bundle.js`, and `AnimalLib.bundle.js`.
+
+    It is possible that other pages will require a different mix of bundles.
+
+    This is true even if all that your application libraries do is rgister handler methods. You still need at least one file for initialization, etc. If nothing else, you need one file to import the application libraries.
+
+- **Third party libraries will change fairly infrequently.**
+
+    This one is straightforward. If the third party libraries do not change frequently, they will only need to be loaded the first time the user visits the page. All subsequent times, the library will be cached. Unless you need the latest updates, you should avoid continuously updating your third party libraries (this is why things like `package-lock.json` exist).
+    
+    In fact, if you use a common CDN rather than serve it from your server, you get a double win: you don't decrease the load on your server, and there is a possibility that the user might have already cached the file on another website, saving you the trouble of loading it at all.
+
+
+- **The dependency graph of application libraries is relatively stable.**
+
+    Over time, as we add more features, a particular application library will use more and more features of another application/vendor library, but we expect the larger the dependency graph between application and vendor libraries will be fairly constant. So, by making each application library a separate bundle, the client can cache entire application libraries. 
+
+    This is different from the standard way of doing things, which is to create two bundles: `app.bundle.js`, `vendor.bundle.js`. The disadvantage of this method is that if we build all vendor libraries into a single bundle and application libraries into a single bundle, then every import that is added/removed in the application code will cause a corresponding addition/removal of code in both the bundle, thus changing its hash and preventing clients from caching it. 
+    
+    By using the [modular TypeScript structure](#modular-typescript-structure), we ensure that a change in the code of any application library will not affect the output bundle of any of its dependents, and vice verca. Caching is thus maximized.
+
+- **Users will visit the page(s) frequently.**
+
+    For some kind of pages, the user will only visit a particular page very rarely. E.g. the payment page for a subscription-based website. The user will only visit this page once a year or so. It does not make sense to use this kind of project module structure for such a page; you might as well save yourself the hassle of creating a complex build system, and create a single bundle of all your code.
+
+    We assume that the median user will use the web app, then go away for some time, and the next time (s)he visits the app, _none_ or _some_ of the code will have changed. 
+    
+    The word _some_ here is important. We assume the project is being actively worked on, and _all_ the code will not have changed between user visits. Thus, user's browser can cache the modules which are unchanged between one visit and the next.
+
+    An ideal example of the kind of use-case we are targeting is an Amazon product page:
+    - Users often use Amazon in bursts: they will use it once for an hour, opening different products to compare, then after making a purchase (or not), they will not visit any product page for a week or two. 
+    - The JavaScript, CSS etc. for the Amazon product page can be cached the first time they open the page, and then these cached files can be reused for the rest of the session. 
+    - During the next session, if only a small percentage of the code has been modified (say, 0-30%) then on visiting the product page for the first time, only those pieces of code will need to be reloaded. For all subsequent page visits in this session, the files will be completely cached, just as they were in the previous session.
+
+These assumptions are all important for our project because _importing entire application libraries as bundles is not optimal in terms of network bandwidth_. 
+
+It is highly possible, even probable, that the bundles have some code which is unused. In our example TypeScript project, we include the code of `src/ProductLib/MobilePhone.ts` and `src/ProductLib/PhoneNumber.ts` into `ProductLib.bundle.js`, even though they are never used by `main.ts`. If this happens for all application libraries, then the total size of the code sent to the client increases significantly.
+
+So, why do we do this, then? Because on each visit _the user only pays the cost of the modified application libraries_. On average over multiple visits, the user will be paying a much smaller cost than if he loaded the entire bundle fresh each time.
+
+Let's take an example to explain this:
+
+1. Assume there are eight application libraries: `ALib`, `BLib`, ... , `HLib`. 
+    - Case 1: Each of the corresponding bundles (`ALib.bundle.js` to `GLib.bundle.js`) is 125 KB, for a total of 1 MB. The main entry file, `page.ts`, adds 1KB (negligible).
+    - Case 2: Assume we write all our imports such that only the specific file is required instead of the entire bundle (i.e. `import { Product } from "./ProductLib/Product"` instead of `import { Product } from "./ProductLib"`), then on bundling with `page.ts` as the entry point, the resulting bundle has size 700 KB (a 30% savings in the size over Case 1).
+1. Assume the user visits the page with a frequency such that and between visits (on average), 4 out of the 8 bundles have changed (i.e. 50% deltas). Note that each visit is a really a "session", i.e. we load only one page, and thus there is no caching until the next session.
+1. Let us now calculate the _total_ network bandwidth consumed in both cases, over 10 user sessions:
+    - In case 1 (8 separate bundles):
+        1. Session 1: we pay the full cost of 1 MB  i.e. 1000 KB.
+        2. Session 2-10: we pay `(average number of bundles changed)*(bundle size)*(number of visits)`, i.e. `4*125*9` = 4500 KB.
+        3. The total cost paid is 5500KB, for an amortized cost of 550KB per session.
+    - In case 2 (one single bundle):
+        1. Since 50% of the content of the bundle changes, we have to _reload the entire bundle every time_. This is where the amortized cost of having a single bundle goes up. Over 10 sessions, we load 10*700 = 7000 KB, or 700 KB per session.
+    
+    As we have more and more sessions, the amortized cost of having multiple bundles decreases until it is eventually close to its theoretical minimum, 4500 KB.
+
+Note that this calculation assumes that there we set the [HTTP cache control directive](https://developers.google.com/web/fundamentals/performance/optimizing-content-efficiency/http-caching) as `no-cache`, i.e. the client always checks with the server if the file has changed. This does incur an excess cost in each request. 
+
+If we instead use the `max-age` paramter, the client will wait for some time before asking the server if the file has changed. 
+- Thus, we cache the files for longer, decreasing the network latency for both single-bundle and multi-bundle builds.
+- The value of `max-age` should be synced up with your Production deployment strategy: if you deploy code to Prod at 12pm on Wednesdays and Fridays, you should set the value of `max-age` as the number of seconds in two days (i.e. 172,800), since that is the maximum amount of time that you can be sure that the resource will not be stale. 
+- Alternatively, the value of `max-age` can be calculated based on the past data of your application libraries. Assuming your web application is divided into one or more Git repositories, you can check [Git statistics](https://stackoverflow.com/questions/1828874/generating-statistics-from-git-repository) for how often code inside an application library changes. You can then set the `max-age` based on mean/median for the entire life of the repo, or maybe just the last 30 days or so (if there is a sudden jump in the coding effort going into a particular application library, e.g. due to prioritization by management, then looking at data of the last x days might be more useful than the lifetime of the entire repo).
