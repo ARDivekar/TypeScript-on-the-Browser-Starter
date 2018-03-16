@@ -2609,7 +2609,7 @@ By setting up our project like this, we make a few important assumptions about t
     However, you should always minify and cache large vendor libraries. There is almost never a disadvantage here.
     - "Large" is subjective: the Webpack size warning is triggered at 30 KB. Look for data on your users' hardware specifications (network speed, device CPU, RAM) to see what is acceptable.
 
-    This example project does not really have a lot of code, but that's because it's, well, an example. In real life you will probably write a lot more code and much more complexity.
+    This example project does not really have a lot of code, but that's because it's, well, an example. In real life you will probably write a lot more code and with much more complexity.
 
 
 - **Different pages in our web app will require a single entry file but different application and vendor library bundles.** 
@@ -2620,7 +2620,7 @@ By setting up our project like this, we make a few important assumptions about t
 
     It is possible that other pages will require a different mix of bundles.
 
-    This is true even if all that your application libraries do is rgister handler methods. You still need at least one file for initialization, etc. If nothing else, you need one file to import the application libraries.
+    This is true even if all that your application libraries do is register handler methods. You still need at least one entry file for initialization, etc. If nothing else, you need one file to import the application libraries.
 
 - **Third party libraries will change fairly infrequently.**
 
@@ -2633,7 +2633,7 @@ By setting up our project like this, we make a few important assumptions about t
 
     Over time, as we add more features, a particular application library will use more and more features of another application/vendor library, but we expect the larger the dependency graph between application and vendor libraries will be fairly constant. So, by making each application library a separate bundle, the client can cache entire application libraries. 
 
-    This is different from the standard way of doing things, which is to create two bundles: `app.bundle.js`, `vendor.bundle.js`. The disadvantage of this method is that if we build all vendor libraries into a single bundle and application libraries into a single bundle, then every import that is added/removed in the application code will cause a corresponding addition/removal of code in both the bundle, thus changing its hash and preventing clients from caching it. 
+    This is different from the standard way of doing things, which is to create two bundles: `app.bundle.js`, `vendor.bundle.js`. The disadvantage of this method is that since we build all vendor libraries into a single bundle and application libraries into a single bundle, then every import that is added/removed in the application code will cause a corresponding addition/removal of code in the vendor bundle too, thus changing the hashes of both bundles and preventing clients from caching them.
     
     By using the [modular TypeScript structure](#modular-typescript-structure), we ensure that a change in the code of any application library will not affect the output bundle of any of its dependents, and vice verca. Caching is thus maximized.
 
@@ -2654,9 +2654,11 @@ These assumptions are all important for our project because _importing entire ap
 
 It is highly possible, even probable, that the bundles have some code which is unused. In our example TypeScript project, we include the code of `src/ProductLib/MobilePhone.ts` and `src/ProductLib/PhoneNumber.ts` into `ProductLib.bundle.js`, even though they are never used by `main.ts`. If this happens for all application libraries, then the total size of the code sent to the client increases significantly.
 
-So, why do we do this, then? Because on each visit _the user only pays the cost of the modified application libraries_. On average over multiple visits, the user will be paying a much smaller cost than if he loaded the entire bundle fresh each time.
+So, why do we do this, then? Because on each visit _the user only pays the cost of the modified application libraries_. On average over multiple visits, the user will be paying a much smaller cost than if he loaded the entire bundle fresh each time. If `main.ts` starts using `ProductLib/MobilePhone.ts` and stops using `ProductLib/TShirt.ts`, then only `main.bundle.js` will change. If we replace `CompanyLib/Company`'s usage of a `Set` with just a simple array, only `CompanyLib.bundle.js` is affected; `main.bundle.js` is unchanged. 
 
-Let's take an example to explain this:
+#### <a name="app-library-bundle-calculation">Cost savings of App Library bundles</a>:
+
+Let's perform some calculations to solidify this idea:
 
 1. Assume there are eight application libraries: `ALib`, `BLib`, ... , `HLib`. 
     - Case 1: Each of the corresponding bundles (`ALib.bundle.js` to `GLib.bundle.js`) is 125 KB, for a total of 1 MB. The main entry file, `page.ts`, adds 1KB (negligible).
@@ -2672,9 +2674,65 @@ Let's take an example to explain this:
     
     As we have more and more sessions, the amortized cost of having multiple bundles decreases until it is eventually close to its theoretical minimum, 4500 KB.
 
-Note that this calculation assumes that there we set the [HTTP cache control directive](https://developers.google.com/web/fundamentals/performance/optimizing-content-efficiency/http-caching) as `no-cache`, i.e. the client always checks with the server if the file has changed. This does incur an excess cost in each request. 
 
-If we instead use the `max-age` paramter, the client will wait for some time before asking the server if the file has changed. 
-- Thus, we cache the files for longer, decreasing the network latency for both single-bundle and multi-bundle builds.
-- The value of `max-age` should be synced up with your Production deployment strategy: if you deploy code to Prod at 12pm on Wednesdays and Fridays, you should set the value of `max-age` as the number of seconds in two days (i.e. 172,800), since that is the maximum amount of time that you can be sure that the resource will not be stale. 
-- Alternatively, the value of `max-age` can be calculated based on the past data of your application libraries. Assuming your web application is divided into one or more Git repositories, you can check [Git statistics](https://stackoverflow.com/questions/1828874/generating-statistics-from-git-repository) for how often code inside an application library changes. You can then set the `max-age` based on mean/median for the entire life of the repo, or maybe just the last 30 days or so (if there is a sudden jump in the coding effort going into a particular application library, e.g. due to prioritization by management, then looking at data of the last x days might be more useful than the lifetime of the entire repo).
+#### Limitations of the App Library bundling pattern:
+
+1. **Imports must remain constant**:
+
+    - Any changes in an application library that require its consumers to change their imports (e.g. folder restructuring, file renaming, splitting of code into different files, etc) will trigger a change in the consumer bundles, and as a result. 
+
+        This is why _the structuring of files should be treated as part of its exported API_. It should not be changed often.
+
+    - This limitation can be mitigated by creating a _exporter file_ in each App Library. For TypeScript, use `AppLib/index.ts`, since the language treats each folder with an `index.ts` as a code library.
+
+        E.g. let us create `CompanyLib/index.ts` and export all its contents:
+        ```ts
+        /* CompanyLib/index.ts */
+        export { Person } from "./Person";
+        export { Organization } from "./Organization";
+        export { TechCompany } from "./TechCompany";
+        ```
+        This uses TypeScript's re-export feature to forward exports to the consumers. Now, all consumers can import the app library as such:
+        ```ts
+        /* main.ts */
+        import * as $ from "jquery";
+        import { Person, Organization, TechCompany } from "./CompanyLib"
+        ...
+        ```
+        Advantages of this method:
+        1. Any folder restructuring or file renaming inside the app library is transparent to its consumers. 
+        
+            E.g. suppose we change the name of `TechCompany.ts` to `TechnologyCompany.ts` and move it into the folder `CompanyLib/CompanyTypes/`. Consumers don't need to have any idea about this change:
+            
+            ```ts
+            /* CompanyLib/index.ts */
+            export { Person } from "./Person";
+            export { Organization } from "./Organization";
+            export { TechnologyCompany as TechCompany }  from "./CompanyTypes/TechnologyCompany";
+            ```
+        1. By removing (de-registering) a file's export from `index.ts`, it is automatically removed from the app library bundle, thus reducing its size.
+
+        1. Imports are cleaner.
+
+        Disadvantages of this method:
+        1. Splitting of code into different files will still trigger changes in the consumer bundle, since both files must now be imported. This is unavoidable.
+        1. There is a cost associated with maintaining `index.ts`. However, as `index.ts` explicitly defines the exported API of the application library, this cost cannot be avoided.
+        1. There is no mechanism to force the useage of `index.ts`. Consumers can still do the following:
+            ```ts
+            /* main.ts */
+            import * as $ from "jquery";
+            import { Person } from "./CompanyLib/Person"
+            import { Organization } from "./CompanyLib/Organization";
+            import { TechCompany } from "./CompanyLib/TechCompany";
+            ...
+            ```
+            Thus, we now actually have _two_ ways of importing from the application library. This can lead to confusion if different consumers import from the app library in an inconsistent way.
+        1. The bundle size does increase (negligibly) due to the size of the `index.ts`.
+        
+
+1. The [calculation above](#app-library-bundle-calculation) assumes that there we set the [HTTP cache control directive](https://developers.google.com/web/fundamentals/performance/optimizing-content-efficiency/http-caching) as `no-cache`, i.e. the client always checks with the server if the file has changed. This does incur an excess cost in each request.
+
+    If we instead use the `max-age` paramter, the client will wait for some time before asking the server if the file has changed. 
+    - Thus, we cache the files for longer, decreasing the network latency for both single-bundle and multi-bundle builds.
+    - The value of `max-age` should be synced up with your Production deployment strategy: if you deploy code to Prod at 12pm on Wednesdays and Fridays, you should set the value of `max-age` as the number of seconds in two days (i.e. 172,800), since that is the maximum amount of time that you can be sure that the resource will not be stale. 
+    - Alternatively, the value of `max-age` can be calculated based on the past data of your application libraries. Assuming your web application is divided into one or more Git repositories, you can check [Git statistics](https://stackoverflow.com/questions/1828874/generating-statistics-from-git-repository) for how often code inside an application library changes. You can then set the `max-age` based on mean/median for the entire life of the repo, or maybe just the last 30 days or so (if there is a sudden jump in the coding effort going into a particular application library, e.g. due to prioritization by management, then looking at data of the last x days might be more useful than the lifetime of the entire repo).
